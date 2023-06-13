@@ -176,7 +176,7 @@ try:
     df = pd.merge(sdfParcels, dfBMP, on='APN', how='inner')
 
     # specify fields to keep
-    fields = list(df.columns)[:3]+list(df.columns)[75:]+[list(df.columns)[73]]
+    fields = list(df.columns)[:3]+list(df.columns)[76:]+[list(df.columns)[74]]
 
     # specify fields to keep
     dfOut = df[fields].copy()
@@ -324,7 +324,7 @@ try:
     df = pd.merge(sdfParcels, dfLTAPN, on='APN', how='inner')
 
     # create fields list
-    fields = list(df.columns)[0:2]+[list(df.columns)[20]]+list(df.columns)[69:]+[list(df.columns)[68]]
+    fields = list(df.columns)[0:2]+[list(df.columns)[20]]+list(df.columns)[75:]+[list(df.columns)[74]]
 
     # specify fields to keep
     dfOut = df[fields].copy()
@@ -348,7 +348,7 @@ try:
     df = pd.merge(sdfParcels, dfIPES, on='APN', how='inner')
 
     # create fields list
-    fields = list(df.columns)[0:2]+[list(df.columns)[20]]+list(df.columns)[74:]+[list(df.columns)[73]]
+    fields = list(df.columns)[0:2]+[list(df.columns)[20]]+list(df.columns)[75:]+[list(df.columns)[74]]
 
     # specify fields to keep
     dfOut = df[fields].copy()
@@ -372,7 +372,7 @@ try:
     df = pd.merge(sdfParcels, dfLCVinfo, on='APN', how='inner')
 
     # specify fields to keep
-    fields = list(df.columns)[0:2]+list(df.columns)[75:]+[list(df.columns)[73]]
+    fields = list(df.columns)[0:2]+list(df.columns)[76:]+[list(df.columns)[74]]
 
     # specify fields to keep
     dfOut = df[fields].copy()
@@ -395,7 +395,7 @@ try:
     df = pd.merge(sdfParcels, dfDRBank, on='APN', how='inner')
 
     # specify fields to keep
-    fields = list(df.columns)[0:2]+list(df.columns)[74:]+[list(df.columns)[73]]
+    fields = list(df.columns)[0:2]+list(df.columns)[75:]+[list(df.columns)[74]]
 
     # specify fields to keep
     dfOut = df[fields].copy()
@@ -418,7 +418,7 @@ try:
     df = pd.merge(sdfParcels, dfDRTrans, on='APN', how='left')
 
     # specify fields to keep
-    fields = list(df.columns)[0:2]+list(df.columns)[74:]+[list(df.columns)[73]]
+    fields = list(df.columns)[0:2]+list(df.columns)[75:]+[list(df.columns)[74]]
 
     # specify fields to keep
     dfOut = df[fields].copy()
@@ -440,7 +440,7 @@ try:
     df = pd.merge(sdfParcels, dfDeed, on='APN', how='left')
 
     # specify fields to keep
-    fields = list(df.columns)[0:2]+list(df.columns)[74:]+[list(df.columns)[73]]
+    fields = list(df.columns)[0:2]+list(df.columns)[75:]+[list(df.columns)[74]]
 
     # specify fields to keep
     dfOut = df[fields].copy()
