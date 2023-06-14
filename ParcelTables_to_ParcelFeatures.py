@@ -1,7 +1,7 @@
 """
 ParcelTables_to_ParcelFeatures.py
 Created: March 13th, 2020
-Last Updated: February 24th, 2022
+Last Updated: June 14th, 2023
 Mason Bindl, Tahoe Regional Planning Agency
 Amy Fish, Tahoe Regional Planning Agency
 
@@ -11,8 +11,10 @@ This ETL process updates parcel based feature classes for Development Rights, BM
 Historic Parcels, Securities, Grading Exceptions, Deed Restrictions, and Soils Hydro Projects
 
 This script uses Python 3.x and was designed to be used with 
-the default ArcGIS Pro python enivorment "arcgispro-py3-clone", with
+the default ArcGIS Pro python enivorment ""C:/Program Files/ArcGIS/Pro/bin/Python/envs/arcgispro-py3/python.exe"", with
 no need for installing new libraries.
+
+This script runs nightly at 10pm on Arc10 from scheduled task "ParcelETL"
 """
 #--------------------------------------------------------------------------------------------------------#
 # import packages and modules
@@ -74,14 +76,22 @@ bmpConnect = pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server};SERVER=sql14
 # BMP - create dataframe from tahoebmpsde table
 dfBMP      = pd.read_sql("SELECT * FROM tahoebmpsde.dbo.v_BMPStatus", bmpConnect)
 
-# make sql database connection to Accela with pyodbc
-accConnect = pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server};SERVER=ASQL;DATABASE=Accela;UID=BMP_Update;PWD=BMP_update_123')
-# Accela - create dataframes from sql tables
-dfLCV      = pd.read_sql("SELECT * FROM Accela.dbo.v_LandCapabilityVerifications", accConnect)
-dfLCC      = pd.read_sql("SELECT * FROM Accela.dbo.v_LandCapabilityChallenges", accConnect)  
-dfSoil     = pd.read_sql("SELECT * FROM Accela.dbo.v_HydroSoilsProjects", accConnect)
-dfHist     = pd.read_sql("SELECT * FROM Accela.dbo.v_HistoricDeterminations", accConnect)
-dfGrade    = pd.read_sql("SELECT * FROM Accela.dbo.v_GradingExceptions", accConnect)
+# # make sql database connection to Accela with pyodbc
+# accConnect = pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server};SERVER=ASQL;DATABASE=Accela;UID=BMP_Update;PWD=BMP_update_123')
+# # Accela - create dataframes from sql tables
+# dfLCV      = pd.read_sql("SELECT * FROM Accela.dbo.v_LandCapabilityVerifications", accConnect)
+# dfLCC      = pd.read_sql("SELECT * FROM Accela.dbo.v_LandCapabilityChallenges", accConnect)  
+# dfSoil     = pd.read_sql("SELECT * FROM Accela.dbo.v_HydroSoilsProjects", accConnect)
+# dfHist     = pd.read_sql("SELECT * FROM Accela.dbo.v_HistoricDeterminations", accConnect)
+# dfGrade    = pd.read_sql("SELECT * FROM Accela.dbo.v_GradingExceptions", accConnect)
+
+# make dataframes from exported accela views
+accelaFiles = "//trpa-fs01/GIS/Acella/Reports"
+dfLCV      = pd.read_csv(os.path.join(accelaFiles, "v_landcapabilityverifications.csv"))
+dfLCC      = pd.read_csv(os.path.join(accelaFiles, "v_landcapabilityChallenges.csv"))
+dfSoil     = pd.read_csv(os.path.join(accelaFiles, "v_hydrosoilsprojects.csv"))
+dfHist     = pd.read_csv(os.path.join(accelaFiles, "v_historicdeterminations.csv"))
+dfGrade    = pd.read_csv(os.path.join(accelaFiles, "v_gradingexceptions.csv"))
 
 # LTInfo - create dataframes from JSON found here: https://laketahoeinfo.org/WebServices/List
 dfLTAPN    = pd.read_json("https://laketahoeinfo.org/WebServices/GetAllParcels/JSON/e17aeb86-85e3-4260-83fd-a2b32501c476")
