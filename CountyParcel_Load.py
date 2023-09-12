@@ -12,7 +12,7 @@ from arcgis.features import FeatureSet, GeoAccessor, GeoSeriesAccessor
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import time
-
+from time import strftime
 
 # environment settings
 arcpy.env.workspace = "//Trpa-fs01/GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb"
@@ -32,10 +32,14 @@ portal_pwd = "@dmin6224"
 portal_url = "https://maps.trpa.org/portal/"
 
 sdeBase    = os.path.join(filePath, "Vector.sde/")
+sdeTabular = os.path.join(filePath, "Tabular.sde")
 #Generate old new apn lists
 #Currently no sde.county_parcel_staging
 parcelMaster   = sdeBase + "\\sde.SDE.Parcels\\sde.SDE.Parcel_Master"
 parcelBase     = sdeBase + "\\sde.SDE.Parcels\\sde.SDE.Parcels_Base"
+parcelAPNOldNew = sdeTabular + "\\sde.SDE.Parcel_APN_NewOld"
+
+# New Parcels come from local layer parcel county staging
 parcelNew      = "Parcel_County_Staging"
 
 #This needs to be shifted over to SQL Table
@@ -71,60 +75,6 @@ def UpdateFieldFromDictionary(featureclass, field, update_dictionary):
                 record_count+=record_count
     print(f"{record_count} rows were updated")
 
-
-# combine duplicate records, creating multipart and dissolved polygons 
-@timer
-def CombineAPNs(fc, fld_dissolve):    
-    from time import strftime  
-    print ("Started combining APNs: " + strftime("%Y-%m-%d %H:%M:%S"))
-
-    # get unique values from field
-    value_list = [r[0] for r in arcpy.da.SearchCursor(fc, (fld_dissolve))]
-    unique_vals = list(set(value_list))
-    
-    if len(value_list) !=len(unique_vals):
-        seen = set()
-        dup_vals = set()
-        for x in value_list:
-            if x in seen:
-                dup_vals.add(x)
-            else:
-                seen.add(x)
-        print(dup_vals)
-        dup_vals.remove('')
-        for unique_val in dup_vals:
-            geoms = [r[0] for r in arcpy.da.SearchCursor(fc, ('SHAPE@', fld_dissolve)) if r[1] == unique_val]
-            #Probably don't need this as there will always be more than one geometry
-            if len(geoms) > 1:
-                print(unique_val)    
-                diss_geom = DissolveGeoms(geoms)
-
-                # update the first feature with new geometry and delete the others
-                where = "{} = '{}'".format(fld_dissolve, unique_val)
-                cnt = 0
-                with arcpy.da.UpdateCursor(fc, ('SHAPE@'), where) as curs:
-                    for row in curs:
-                        cnt += 1
-                        if cnt == 1:
-                            row[0] = diss_geom
-                            curs.updateRow(row)
-                        else:
-                            curs.deleteRow()
-    else:
-        print("No duplicates!")
-    print ("Finished combining APNs: " + strftime("%Y-%m-%d %H:%M:%S"))
-    
-# union all geometry inputs into one dissolved geometry
-@timer
-def DissolveGeoms(geoms):
-    cnt = 0
-    for geom in geoms:
-        cnt += 1
-        if cnt == 1:
-            diss_geom = geom
-        else:
-            diss_geom = diss_geom.union(geom)
-    return diss_geom
 
 # moves attribute values from one feature class to the other using an aspatial join
 @timer
@@ -214,6 +164,7 @@ def differenceDictionary(df1, df2, key_field, fields_to_ignore):
     #
     new_dict = {k: {a: b for a, b in v.items() if not pd.isnull(b)} 
                 for k, v in dict_update.items()}
+    # This portion gets rid of APNs with no changes to keep dictionary size managable
     keys_to_remove = []
     for outer_key, inner_dict in new_dict.items():
         inner_keys_to_remove = []
@@ -263,7 +214,8 @@ def update_fc_from_dict(update_dict,key_field, fc):
     print(f"Total updated{total_count}")
     return apn_issues
 
-#Seperated out into two functions so we can use this function to make old new table in SQL
+#Seperated out into two functions 
+# so we can use this function to make old new table in SQL
 @timer
 def make_old_new_dataframe(old_feature_class, new_feature_class, TRPA_boundary, prefix_remove):
     df_old = pd.DataFrame.spatial.from_featureclass(old_feature_class)
@@ -447,28 +399,9 @@ parcel_base_old_apn   = old_new_parcels_list(featureLayer_Base, parcelNew, 'No',
                                            prefix_remove,'Old APN')
 
 #Need to generate a list of new and old parcels and add it to TableNewOld_APN in sde_tabular
-# I think maybe we should do this later? Store the dataframe but don't actually add it to the SQL table until everything else is successfull
+# Make the dataframe for eventual insert to new_old SQL table - wait to actually insert until process is complete
 
 df_parcel_changes = make_old_new_dataframe(featureLayer, parcelNew, 'Yes', prefix_remove)
-field_mapping = arcpy.FieldMappings()
-
-field_mapping_info = [('APN', 'APN'), ('Status', 'Status'), ('TRPA_Boundary','TRPA_Boundary'), ('DiscoveryDate','DiscoveryDate')]
-
-for source_field, target_field in field_mapping_info:
-    field_map = arcpy.FieldMap()
-    field_map.addInputField(df_parcel_changes, source_field)
-    output_field = field_map.outputField
-    output_field.name = target_field
-    field_map.outputField = output_field
-    field_mapping.addFieldMap(field_map)
-
-np_array = df_parcel_changes.to_records(index=False)
-
-#The _ means that we don't care about the first variable in the tuple ( I think this is some ChatGPT nonsense)
-#Need to update to point at the Parcel_NewOld Table
-with arcpy.da.InsertCursor('tablenewold_APN', [target_field for _, target_field in field_mapping_info]) as cursor:
-    for row in np_array:
-        cursor.insertRow(row)
 
 
 # UPDATE PARCEL MASTER
@@ -590,3 +523,28 @@ delete_old_parcels(featureLayer_Base, parcel_base_old_apn)
 insert_new_parcels(featureLayer_Base, parcel_base_new_apn, parcelNew, fields)
 update_parcel_geometry(featureLayer_Base, parcelNew)
 
+#Update new_old
+try:
+    field_mapping = arcpy.FieldMappings()
+
+    field_mapping_info = [('APN', 'APN'), ('Status', 'Status'), ('TRPA_Boundary','TRPA_Boundary'), ('DiscoveryDate','DiscoveryDate')]
+
+    for source_field, target_field in field_mapping_info:
+        field_map = arcpy.FieldMap()
+        field_map.addInputField(df_parcel_changes, source_field)
+        output_field = field_map.outputField
+        output_field.name = target_field
+        field_map.outputField = output_field
+        field_mapping.addFieldMap(field_map)
+
+    np_array = df_parcel_changes.to_records(index=False)
+
+    #Need to update to point at the Parcel_NewOld Table
+    with arcpy.da.InsertCursor(parcelAPNOldNew, [target_field for _, target_field in field_mapping_info]) as cursor:
+        for row in np_array:
+            cursor.insertRow(row)
+except Exception as e:
+    print (f"Issue with updating list of new and old parcels: {e}")
+    parcel_list_name = "Parcel_Update_" + strftime("%Y-%m-%d")+".csv"
+    df_parcel_changes.to_csv(parcel_list_name)
+    
