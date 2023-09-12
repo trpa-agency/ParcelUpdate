@@ -53,12 +53,8 @@ filePath = "//Trpa-fs01/GIS/PARCELUPDATE/Workspace/"
 
 # portal signin
 ## TRPA_ADMIN credentials
-
-
 portal_user = "TRPA_PORTAL_ADMIN"
 portal_pwd = str(os.environ.get('Password'))
-
-# portal_pwd = "@dmin6224"
 portal_url = "https://maps.trpa.org/portal/"
 # sign in
 arcpy.SignInToPortal(portal_url, portal_user, portal_pwd)
