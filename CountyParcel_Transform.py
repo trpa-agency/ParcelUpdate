@@ -19,10 +19,6 @@ This script runs on the 16th of each month at 1am on Arc10 from scheduled task "
 #----------------------------------------------------------------------
 # SETUP
 #----------------------------------------------------------------------
-
-#----------------------------------------------------------------------
-# FUNCTIONS
-#----------------------------------------------------------------------
 # import packages
 import urllib
 import json
@@ -76,10 +72,155 @@ sdeTabular = os.path.join(filePath, "Tabular.sde")
 # portal signin
 ## TRPA_ADMIN credentials 
 portal_user = "TRPA_PORTAL_ADMIN"
-portal_pwd = "@dmin6224"
+portal_pwd = str(os.environ.get('Password'))
 portal_url = "https://maps.trpa.org/portal/"
 # sign in
 arcpy.SignInToPortal(portal_url, portal_user, portal_pwd)
+
+
+# Parcel AOI to select parcels to keep (includes TRPA Boundary and Olympic Valley Watershed)
+parcelAOI = "Parcel_AOI"
+
+#sde feature classes to use in attribution stage
+sde_Impervious       = sdeBase + "\\sde.SDE.Impervious\\sde.SDE.Impervious_2019"
+sde_Bailey           = sdeBase + "\\sde.SDE.Soils\sde.SDE.land_capability_Bailey_Soils"
+sde_RegionalLandUse  = os.path.join(sdeBase,"sde.SDE.Planning/sde.SDE.RegionalLandUse")
+sde_NRCSSoils1974    = sdeBase + "\\sde.SDE.Soils\\sde.SDE.NRCS_Soils_1974"
+sde_NRCSSoils2003    = sdeBase + "\\sde.SDE.Soils\\sde.SDE.NRCS_Soils_2003"
+sde_Catchment        = sdeBase + "\\sde.SDE.WaterQuality\\sde.SDE.TMDL_Catchment"
+sde_HydroArea        = sdeBase + "\\sde.SDE.Water\\sde.SDE.Hydro_Areas"
+sde_Watershed        = sdeBase + "\\sde.SDE.Water\\sde.SDE.Watershed"
+sde_FireDistrict     = sdeBase + "\\sde.SDE.Jurisdictions\\sde.SDE.FireDistricts"
+sde_LocalPlan        = sdeBase + "\\sde.SDE.Planning\\sde.SDE.LocalPlan"
+sde_SpecialDistrict  = sdeBase + "\\sde.SDE.Planning\\sde.SDE.SpecialPlanningDistrict"
+sde_CSLT             = sdeBase + "\\sde.SDE.Jurisdictions\\sde.SDE.CSLT"
+sde_CurrentParcels   = sdeBase + "\\sde.SDE.Parcels\\sde.SDE.Parcel_Master"
+sde_Zoning           = sdeBase + "\\sde.SDE.Planning\\sde.SDE.District"
+sde_TownCenter       = sdeBase + "\\sde.SDE.Planning\\sde.SDE.TownCenter"
+sde_TownCenterBuffer = sdeBase + "\\sde.SDE.Planning\\sde.SDE.TownCenter_Buffer"
+sde_Index1987        = sdeBase + "\\sde.SDE.Index\\sde.SDE.AssessorMapIndex_1987"
+sde_TRPAboundary     = sdeBase + "\\sde.SDE.Jurisdictions\\sde.SDE.TRPA_bdy"
+sde_BonusUnitboundary= sdeBase + "\\sde.SDE.Planning\\sde.SDE.Bonus_unit_boundary"
+sde_UrbanArea        = sdeBase + "\\sde.SDE.Jurisdictions\\sde.SDE.UrbanAreas"
+sde_Zip              = sdeBase + "\\sde.SDE.Jurisdictions\\sde.SDE.Postal_ZIP"
+sde_TAZ              = sdeBase + "\\sde.SDE.Transportation\\sde.SDE.Transportation_Analysis_Zone"
+sde_Littoral         = sdeBase + "\\sde.SDE.Shorezone\\sde.SDE.LittoralParcel"
+sde_Tolerance        = sdeBase + "\\sde.SDE.Shorezone\\sde.SDE.Tolerance_District"
+
+# in memory fcs to use in the attribution stage
+memory = "memory" + "\\"
+ParcelPoint_RegionalLandUse = memory + "ParcelPoint_RegionalLandUse"
+ParcelPoint_Soils74         = memory + "ParcelPoint_Soils74"
+ParcelPoint_Soils03         = memory + "ParcelPoint_Soils03"
+ParcelPoint_Catchment       = memory + "ParcelPoint_Catchment"
+ParcelPoint_HydroArea       = memory + "ParcelPoint_HydroArea"
+ParcelPoint_Watershed       = memory + "ParcelPoint_Watershed"
+ParcelPoint_FireDistrict    = memory + "ParcelPoint_FireDistrict"
+ParcelPoint_LocalPlan       = memory + "ParcelPoint_LocalPlan"
+ParcelPoint_TownCenter      = memory + "ParcelPoint_TownCenter"
+ParcelPoint_TownCenterBuffer= memory + "ParcelPoint_TownCenterBuffer"
+ParcelPoint_Zoning          = memory + "ParcelPoint_Zoning"
+ParcelPoint_SpecialDistrict = memory + "ParcelPoint_SpecialDistrict"
+ParcelPoint_Index1987       = memory + "ParcelPoint_Index1987"
+ParcelPoint_PstlTown        = memory + "ParcelPoint_PstlTown"
+ParcelPoint_PstlZip         = memory + "ParcelPoint_PstlZip"
+ParcelPoint_CSLT            = memory + "ParcelPoint_CSLT"
+ParcelPoint_TAZ             = memory + "ParcelPoint_TAZ"
+ParcelPoint_Design          = memory + "ParcelPoint_Design"
+ParcelPoint_Littoral        = memory + "ParcelPoint_Littoral"
+ParcelPoint_Tolerance       = memory + "ParcelPoint_Tolerance"
+
+# Set up fields to add to FGDB.
+baseFields = [
+# apn ppno
+['APN_TRPA', 'TEXT', 'APN', 50],
+['PPNO_TRPA', 'DOUBLE','PPNO'],
+['JURISDICTION_TRPA', 'TEXT', 'Jurisdiction', 4],
+['COUNTY_TRPA', 'TEXT', 'County', 2],
+ # parcel address   
+['HSE_NUMBR_TRPA', 'TEXT', 'House Number', 25],
+['UNIT_NUMBR_TRPA', 'TEXT', 'Unit Number', 50],
+['STR_DIR_TRPA', 'TEXT','Street Direction', 5],
+['STR_NAME_TRPA', 'TEXT', 'Street Name', 100],
+['STR_SUFFIX_TRPA', 'TEXT', 'Street Suffix', 6],
+['APO_ADDRESS_TRPA', 'TEXT', 'Full Address', 100],
+['PSTL_TOWN_TRPA', 'TEXT', 'Postal Town', 25],
+['PSTL_STATE_TRPA', 'TEXT', 'Postal State', 2],
+['PSTL_ZIP5_TRPA', 'TEXT', 'Postal Zip Code', 5],
+# owner info
+['OWN_FIRST_TRPA', 'TEXT', 'Owner First Name', 255],
+['OWN_LAST_TRPA', 'TEXT', 'Owner Last Name', 255],
+['OWN_FULL_TRPA', 'TEXT', 'Owner Name', 255],
+    # swap this in soon
+# ['OWNER_NAME_TRPA', 'TEXT', 'Owner Name', 255],
+['MAIL_ADD1_TRPA', 'TEXT', 'Mailing Address', 100],
+['MAIL_CITY_TRPA', 'TEXT', 'Mailing City', 50],
+['MAIL_STATE_TRPA', 'TEXT', 'Mailing State', 25],
+['MAIL_ZIP5_TRPA', 'TEXT', 'Mailing Zip Code', 5],
+# value fields  
+['AS_LANDVALUE_TRPA', 'LONG','Assessed Land Value'],
+['AS_IMPROVALUE_TRPA', 'LONG','Assessed Improved Value'],
+['AS_SUM_TRPA', 'LONG', 'Assessed Sum Value'],
+['TAX_LANDVALUE_TRPA', 'LONG','Tax Land Value'],
+['TAX_IMPROVALUE_TRPA', 'LONG','Tax Improved Value'],
+['TAX_SUM_TRPA', 'LONG','Tax Sum'],
+['TAX_YEAR_TRPA', 'TEXT','Tax Year', 5],
+# jurisdiction land use fields
+['COUNTY_LANDUSE_CODE_TRPA', 'TEXT', 'County Landuse Code', 50],
+['COUNTY_LANDUSE_TRPA', 'TEXT', 'County Landuse', 250],
+# Fields for building info
+["YEAR_BUILT_TRPA", "SHORT", 'Year Built', 5],
+['UNITS_TRPA', 'DOUBLE', 'Units', 5],
+["BEDROOMS_TRPA", "DOUBLE",'Bedrooms'],
+['BATHROOMS_TRPA', 'DOUBLE', 'Bathrooms'],
+['BUILDING_SQFT_TRPA', 'DOUBLE', 'Building Size'],
+# fields to add? 
+["VHR_TRPA", "TEXT", "Vacation Home Rental", 3],
+["HOA_TRPA", "TEXT", "Home Owners Association", 3]
+]
+
+trpaFields = [
+# land use
+['OWNERSHIP_TYPE_TRPA', 'TEXT', 'Ownership Type', 50],
+['EXISTING_LANDUSE_TRPA', 'TEXT', 'Existing Landuse', 50],
+['REGIONAL_LANDUSE_TRPA', 'TEXT', 'Regional Landuse', 50], 
+# Fields for soil, watershed, etc...
+['ESTIMATED_COVERAGE_ALLOWED_TRPA', 'DOUBLE', "Estimate of Coverage Allowed (Bailey, sq.ft.)"],
+['IMPERVIOUS_SURFACE_SQFT_TRPA', 'DOUBLE', "Impervious Surface (Remote Sensing, sq.ft.)"],
+['SOIL_1974_TRPA', 'TEXT','NRCS Soils 1974', 5],
+["SOIL_2003_TRPA", "TEXT", "NRCS Soils 2003", 5],
+["CATCHMENT_TRPA", "TEXT", "Catchment", 150],
+["HRA_NAME_TRPA", "TEXT", "Hydrologic Resource Area", 30],
+["WATERSHED_NUMBER_TRPA", "SHORT", "Watershed Number"],
+["WATERSHED_NAME_TRPA", "TEXT", "Watershed Name", 30],
+["PRIORITY_WATERSHED_TRPA", "TEXT", "Priority Watershed", 2],
+["FIREPD_TRPA", "TEXT", "Fire Protection District", 25],
+# Fields for Planning purposes
+["PLAN_ID_TRPA", "TEXT", 'Plan ID',8],
+["PLAN_NAME_TRPA", "TEXT", 'Plan Name', 40],
+["PLAN_TYPE_TRPA", "TEXT", 'Plan Type', 40],
+["ZONING_ID_TRPA", "TEXT", 'Zoning ID', 50],
+["ZONING_DESCRIPTION_TRPA", "TEXT", 'Zoning Description',500],
+["TOWN_CENTER_TRPA", "TEXT",'Town Center', 50],
+["LOCATION_TO_TOWNCENTER_TRPA", "TEXT", 'Location Relative to Town Center', 50],
+["TOLERANCE_ID_TRPA", "TEXT", 'Tolerance ID', 50],
+["TAZ_TRPA", "DOUBLE",'Transportation Analysis Zone'],
+["INDEX_1987_TRPA", "TEXT", "1987 Parcel Map Index",10],
+["LITTORAL_TRPA", "SHORT", "Littoral"],
+["WITHIN_TRPA_BNDY_TRPA", "SHORT","Within TRPA Boundary?"],
+["WITHIN_BONUSUNIT_BNDY_TRPA", "SHORT", "Within Bonus Unit Boundary"],
+["LOCAL_PLAN_HYPERLINK_TRPA", "TEXT", "Local Plan Hyperlink", 255],
+["DESIGN_GUIDELINES_HYPERLINK_TRPA", "TEXT", "Design Guidelines", 255],
+["LTINFO_HYPERLINK_TRPA", "TEXT", "LTinfo Parcel Details", 255],
+["INDEX_1987_HYPERLINK_TRPA", "TEXT", "Index 1987 Hyperlink", 255],
+# Fields for Parcel Size
+["PARCEL_ACRES_TRPA", "DOUBLE", "Acres"],
+["PARCEL_SQFT_TRPA", "DOUBLE", "Square Feet"] 
+]
+
+#----------------------------------------------------------------------
+# FUNCTIONS
+#----------------------------------------------------------------------
 
 ### Functions ###
 # time a function function
@@ -442,145 +583,6 @@ def get_text_fields(feature_class):
             field_list.append(field.name)
     return field_list
 
-# Parcel AOI to select parcels to keep (includes TRPA Boundary and Olympic Valley Watershed)
-parcelAOI = "Parcel_AOI"
-
-#sde feature classes to use in attribution stage
-sde_Impervious       = sdeBase + "\\sde.SDE.Impervious\\sde.SDE.Impervious_2019"
-sde_Bailey           = sdeBase + "\\sde.SDE.Soils\sde.SDE.land_capability_Bailey_Soils"
-sde_RegionalLandUse  = os.path.join(sdeBase,"sde.SDE.Planning/sde.SDE.RegionalLandUse")
-sde_NRCSSoils1974    = sdeBase + "\\sde.SDE.Soils\\sde.SDE.NRCS_Soils_1974"
-sde_NRCSSoils2003    = sdeBase + "\\sde.SDE.Soils\\sde.SDE.NRCS_Soils_2003"
-sde_Catchment        = sdeBase + "\\sde.SDE.WaterQuality\\sde.SDE.TMDL_Catchment"
-sde_HydroArea        = sdeBase + "\\sde.SDE.Water\\sde.SDE.Hydro_Areas"
-sde_Watershed        = sdeBase + "\\sde.SDE.Water\\sde.SDE.Watershed"
-sde_FireDistrict     = sdeBase + "\\sde.SDE.Jurisdictions\\sde.SDE.FireDistricts"
-sde_LocalPlan        = sdeBase + "\\sde.SDE.Planning\\sde.SDE.LocalPlan"
-sde_SpecialDistrict  = sdeBase + "\\sde.SDE.Planning\\sde.SDE.SpecialPlanningDistrict"
-sde_CSLT             = sdeBase + "\\sde.SDE.Jurisdictions\\sde.SDE.CSLT"
-sde_CurrentParcels   = sdeBase + "\\sde.SDE.Parcels\\sde.SDE.Parcel_Master"
-sde_Zoning           = sdeBase + "\\sde.SDE.Planning\\sde.SDE.District"
-sde_TownCenter       = sdeBase + "\\sde.SDE.Planning\\sde.SDE.TownCenter"
-sde_TownCenterBuffer = sdeBase + "\\sde.SDE.Planning\\sde.SDE.TownCenter_Buffer"
-sde_Index1987        = sdeBase + "\\sde.SDE.Index\\sde.SDE.AssessorMapIndex_1987"
-sde_TRPAboundary     = sdeBase + "\\sde.SDE.Jurisdictions\\sde.SDE.TRPA_bdy"
-sde_BonusUnitboundary= sdeBase + "\\sde.SDE.Planning\\sde.SDE.Bonus_unit_boundary"
-sde_UrbanArea        = sdeBase + "\\sde.SDE.Jurisdictions\\sde.SDE.UrbanAreas"
-sde_Zip              = sdeBase + "\\sde.SDE.Jurisdictions\\sde.SDE.Postal_ZIP"
-sde_TAZ              = sdeBase + "\\sde.SDE.Transportation\\sde.SDE.Transportation_Analysis_Zone"
-sde_Littoral         = sdeBase + "\\sde.SDE.Shorezone\\sde.SDE.LittoralParcel"
-sde_Tolerance        = sdeBase + "\\sde.SDE.Shorezone\\sde.SDE.Tolerance_District"
-
-# in memory fcs to use in the attribution stage
-memory = "memory" + "\\"
-ParcelPoint_RegionalLandUse = memory + "ParcelPoint_RegionalLandUse"
-ParcelPoint_Soils74         = memory + "ParcelPoint_Soils74"
-ParcelPoint_Soils03         = memory + "ParcelPoint_Soils03"
-ParcelPoint_Catchment       = memory + "ParcelPoint_Catchment"
-ParcelPoint_HydroArea       = memory + "ParcelPoint_HydroArea"
-ParcelPoint_Watershed       = memory + "ParcelPoint_Watershed"
-ParcelPoint_FireDistrict    = memory + "ParcelPoint_FireDistrict"
-ParcelPoint_LocalPlan       = memory + "ParcelPoint_LocalPlan"
-ParcelPoint_TownCenter      = memory + "ParcelPoint_TownCenter"
-ParcelPoint_TownCenterBuffer= memory + "ParcelPoint_TownCenterBuffer"
-ParcelPoint_Zoning          = memory + "ParcelPoint_Zoning"
-ParcelPoint_SpecialDistrict = memory + "ParcelPoint_SpecialDistrict"
-ParcelPoint_Index1987       = memory + "ParcelPoint_Index1987"
-ParcelPoint_PstlTown        = memory + "ParcelPoint_PstlTown"
-ParcelPoint_PstlZip         = memory + "ParcelPoint_PstlZip"
-ParcelPoint_CSLT            = memory + "ParcelPoint_CSLT"
-ParcelPoint_TAZ             = memory + "ParcelPoint_TAZ"
-ParcelPoint_Design          = memory + "ParcelPoint_Design"
-ParcelPoint_Littoral        = memory + "ParcelPoint_Littoral"
-ParcelPoint_Tolerance       = memory + "ParcelPoint_Tolerance"
-
-# Set up fields to add to FGDB.
-baseFields = [
-# apn ppno
-['APN_TRPA', 'TEXT', 'APN', 50],
-['PPNO_TRPA', 'DOUBLE','PPNO'],
-['JURISDICTION_TRPA', 'TEXT', 'Jurisdiction', 4],
-['COUNTY_TRPA', 'TEXT', 'County', 2],
- # parcel address   
-['HSE_NUMBR_TRPA', 'TEXT', 'House Number', 25],
-['UNIT_NUMBR_TRPA', 'TEXT', 'Unit Number', 50],
-['STR_DIR_TRPA', 'TEXT','Street Direction', 5],
-['STR_NAME_TRPA', 'TEXT', 'Street Name', 100],
-['STR_SUFFIX_TRPA', 'TEXT', 'Street Suffix', 6],
-['APO_ADDRESS_TRPA', 'TEXT', 'Full Address', 100],
-['PSTL_TOWN_TRPA', 'TEXT', 'Postal Town', 25],
-['PSTL_STATE_TRPA', 'TEXT', 'Postal State', 2],
-['PSTL_ZIP5_TRPA', 'TEXT', 'Postal Zip Code', 5],
-# owner info
-['OWN_FIRST_TRPA', 'TEXT', 'Owner First Name', 255],
-['OWN_LAST_TRPA', 'TEXT', 'Owner Last Name', 255],
-['OWN_FULL_TRPA', 'TEXT', 'Owner Name', 255],
-    # swap this in soon
-# ['OWNER_NAME_TRPA', 'TEXT', 'Owner Name', 255],
-['MAIL_ADD1_TRPA', 'TEXT', 'Mailing Address', 100],
-['MAIL_CITY_TRPA', 'TEXT', 'Mailing City', 50],
-['MAIL_STATE_TRPA', 'TEXT', 'Mailing State', 25],
-['MAIL_ZIP5_TRPA', 'TEXT', 'Mailing Zip Code', 5],
-# value fields  
-['AS_LANDVALUE_TRPA', 'LONG','Assessed Land Value'],
-['AS_IMPROVALUE_TRPA', 'LONG','Assessed Improved Value'],
-['AS_SUM_TRPA', 'LONG', 'Assessed Sum Value'],
-['TAX_LANDVALUE_TRPA', 'LONG','Tax Land Value'],
-['TAX_IMPROVALUE_TRPA', 'LONG','Tax Improved Value'],
-['TAX_SUM_TRPA', 'LONG','Tax Sum'],
-['TAX_YEAR_TRPA', 'TEXT','Tax Year', 5],
-# jurisdiction land use fields
-['COUNTY_LANDUSE_CODE_TRPA', 'TEXT', 'County Landuse Code', 50],
-['COUNTY_LANDUSE_TRPA', 'TEXT', 'County Landuse', 250],
-# Fields for building info
-["YEAR_BUILT_TRPA", "SHORT", 'Year Built', 5],
-['UNITS_TRPA', 'DOUBLE', 'Units', 5],
-["BEDROOMS_TRPA", "DOUBLE",'Bedrooms'],
-['BATHROOMS_TRPA', 'DOUBLE', 'Bathrooms'],
-['BUILDING_SQFT_TRPA', 'DOUBLE', 'Building Size'],
-# fields to add? 
-["VHR_TRPA", "TEXT", "Vacation Home Rental", 3],
-["HOA_TRPA", "TEXT", "Home Owners Association", 3]
-]
-
-trpaFields = [
-# land use
-['OWNERSHIP_TYPE_TRPA', 'TEXT', 'Ownership Type', 50],
-['EXISTING_LANDUSE_TRPA', 'TEXT', 'Existing Landuse', 50],
-['REGIONAL_LANDUSE_TRPA', 'TEXT', 'Regional Landuse', 50], 
-# Fields for soil, watershed, etc...
-['ESTIMATED_COVERAGE_ALLOWED_TRPA', 'DOUBLE', "Estimate of Coverage Allowed (Bailey, sq.ft.)"],
-['IMPERVIOUS_SURFACE_SQFT_TRPA', 'DOUBLE', "Impervious Surface (Remote Sensing, sq.ft.)"],
-['SOIL_1974_TRPA', 'TEXT','NRCS Soils 1974', 5],
-["SOIL_2003_TRPA", "TEXT", "NRCS Soils 2003", 5],
-["CATCHMENT_TRPA", "TEXT", "Catchment", 150],
-["HRA_NAME_TRPA", "TEXT", "Hydrologic Resource Area", 30],
-["WATERSHED_NUMBER_TRPA", "SHORT", "Watershed Number"],
-["WATERSHED_NAME_TRPA", "TEXT", "Watershed Name", 30],
-["PRIORITY_WATERSHED_TRPA", "TEXT", "Priority Watershed", 2],
-["FIREPD_TRPA", "TEXT", "Fire Protection District", 25],
-# Fields for Planning purposes
-["PLAN_ID_TRPA", "TEXT", 'Plan ID',8],
-["PLAN_NAME_TRPA", "TEXT", 'Plan Name', 40],
-["PLAN_TYPE_TRPA", "TEXT", 'Plan Type', 40],
-["ZONING_ID_TRPA", "TEXT", 'Zoning ID', 50],
-["ZONING_DESCRIPTION_TRPA", "TEXT", 'Zoning Description',500],
-["TOWN_CENTER_TRPA", "TEXT",'Town Center', 50],
-["LOCATION_TO_TOWNCENTER_TRPA", "TEXT", 'Location Relative to Town Center', 50],
-["TOLERANCE_ID_TRPA", "TEXT", 'Tolerance ID', 50],
-["TAZ_TRPA", "DOUBLE",'Transportation Analysis Zone'],
-["INDEX_1987_TRPA", "TEXT", "1987 Parcel Map Index",10],
-["LITTORAL_TRPA", "SHORT", "Littoral"],
-["WITHIN_TRPA_BNDY_TRPA", "SHORT","Within TRPA Boundary?"],
-["WITHIN_BONUSUNIT_BNDY_TRPA", "SHORT", "Within Bonus Unit Boundary"],
-["LOCAL_PLAN_HYPERLINK_TRPA", "TEXT", "Local Plan Hyperlink", 255],
-["DESIGN_GUIDELINES_HYPERLINK_TRPA", "TEXT", "Design Guidelines", 255],
-["LTINFO_HYPERLINK_TRPA", "TEXT", "LTinfo Parcel Details", 255],
-["INDEX_1987_HYPERLINK_TRPA", "TEXT", "Index 1987 Hyperlink", 255],
-# Fields for Parcel Size
-["PARCEL_ACRES_TRPA", "DOUBLE", "Acres"],
-["PARCEL_SQFT_TRPA", "DOUBLE", "Square Feet"] 
-]
 
 #----------------------------------------------------------------------
 # LOGGING
