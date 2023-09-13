@@ -20,39 +20,14 @@ This script runs on the 16th of each month at 1am on Arc10 from scheduled task "
 # SETUP
 #----------------------------------------------------------------------
 # import packages
-import urllib
-import json
-import requests
 import os
-import shutil
-import sys
 import re
 import logging
-
 from datetime import datetime 
 import time
-from zipfile import ZipFile
-from io import BytesIO
-
 import pandas as pd
-import pyodbc
-
 import arcpy
-from arcgis.features import GeoAccessor, GeoSeriesAccessor
-from arcgis.gis import GIS
-
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-
-# import traceback
-# from pytz import timezone
-# import pytz
-import pathlib
-# from IPython.display import display
-# import getpass
 from time import strftime
-# import linecache
-# import ssl
 
 # environment settings
 arcpy.env.workspace = "//Trpa-fs01/GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb"
@@ -819,7 +794,7 @@ with arcpy.da.UpdateCursor(carsonParcel, [
             row[22] = None
         
         # Tax Year
-        tax_year =  datetime.now().year
+        tax_year =  datetime.datetime.now().year
 
         if not (tax_year is None):
             row[23] = tax_year
@@ -1564,7 +1539,7 @@ with arcpy.da.UpdateCursor(eldoradoParcel, [
             row[22] = None
         
         # Tax Year
-        row[23] = datetime.now().year # get current year
+        row[23] = datetime.datetime.now().year # get current year
             
         # County Land Use Code
         county_luc = row[45]
@@ -1857,7 +1832,7 @@ with arcpy.da.UpdateCursor(placerParcel, ['APN_TRPA',               #0
             row[24] = None
         
         # Tax Year
-        row[25] = datetime.now().year # get current year
+        row[25] = datetime.datetime.now().year # get current year
             
         # County Land Use Code
         county_luc = row[49]
@@ -2065,7 +2040,7 @@ with arcpy.da.UpdateCursor(washoeParcels, ['APN_TRPA',              #row[0]
             
         # Street Name    
         stname = row[40]
-        if not stname in ('CROSS BOW', 'ENTERPRISE', 'STATE ROUTE 28', 'UNSPECIFIED', 'US HIGHWAY 395', ''):
+        if not (stname is None or stname in ('CROSS BOW', 'ENTERPRISE', 'STATE ROUTE 28', 'UNSPECIFIED', 'US HIGHWAY 395', '')):
             if stname[:2] in ('N ', 'S ', 'E ', 'W '):
                 row[5] = stname.rsplit(' ',1)[0].strip().split(' ',1)[1].strip()
             elif not (stname is None or stname == "" or stname.isspace() == True):
@@ -2088,7 +2063,7 @@ with arcpy.da.UpdateCursor(washoeParcels, ['APN_TRPA',              #row[0]
             if not (stname is None or stname == "" or stname.isspace() == True):
                 row[6] = (stname.rsplit(' ')[-1].strip())
             elif stname is None or stname == "" or stname.isspace() == True:
-                if fulladdress[0].isdigit():
+                if not (fulladdress is None or fulladdress[0].isdigit()):
                     row[6] = (fulladdress.rsplit(' ')[-1].strip())
                 else:
                     row[6] = ""
@@ -2135,9 +2110,11 @@ with arcpy.da.UpdateCursor(washoeParcels, ['APN_TRPA',              #row[0]
         else:
             row[14] = ""
             
-        # Mailing Address  
-        address1 = row[46].strip()
-        address2 = row[47].strip()
+        # Mailing Address
+        if not (row[46] is None):  
+            address1 = row[46].strip()
+        if not (row[47] is None):
+            address2 = row[47].strip()
         if not (address1 is None or address1=='' or address1.isspace()==True):
             row[15] = str((address1 + " " + address2).strip())
         elif (address2 is None):
@@ -2160,7 +2137,8 @@ with arcpy.da.UpdateCursor(washoeParcels, ['APN_TRPA',              #row[0]
             row[17] = ''
         
         # Mailing Zipcode
-        mail_zip = row[50].strip()
+        if not (row[50] is None):
+            mail_zip = row[50].strip()
         if not (mail_zip is None or mail_zip=='' or mail_zip.isspace()==True):
             row[18] = mail_zip[:5]
         else:
@@ -2553,7 +2531,7 @@ fields = ("COUNTY_LANDUSE_CODE_TRPA",
 
 with arcpy.da.UpdateCursor(ParcelLayer, fields) as cursor:
     for row in cursor:
-        ctyluc = row[0]
+        ctyluc = str(row[0])
         cty = row[3]
         # set Washoe county land use
         # set TRPA Land Use Description
@@ -3740,6 +3718,8 @@ arcpy.FeatureClassToFeatureClass_conversion(staging_fc,
 
 arcpy.DeleteField_management("Parcel_County_Staging", 
                              ["OBJECTID_1"])
+
+print("Parcel_County_Staging is good to go")
 
 #----------------------------------------------------------------------------------
 # EMAIL FINISH
