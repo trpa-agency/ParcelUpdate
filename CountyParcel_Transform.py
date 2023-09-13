@@ -1,3 +1,33 @@
+"""
+CountyParcel_Transform.py
+Created: June 15th,2023
+Last Updated: June 15th, 2023
+Amy Fish, Tahoe Regional Planning Agency
+Andy McClary, Tahoe Regional Planning Agency
+Mason Bindl, Tahoe Regional Planning Agency
+
+This python script was developed to get data from the five Tahoe Counties.
+El Dorado, Carson, Douglas, Placer, and Washoe. 
+The data is then staged for transformation. 
+
+This script uses Python 3.x and was designed to be used with 
+the default ArcGIS Pro python enivorment ""C:/Program Files/ArcGIS/Pro/bin/Python/envs/arcgispro-py3/python.exe"", with
+no need for installing new libraries.
+
+This script runs on the 16th of each month at 1am on Arc10 from scheduled task "CountyParcelTransform"
+"""
+#----------------------------------------------------------------------
+# SETUP
+#----------------------------------------------------------------------
+
+#----------------------------------------------------------------------
+# FUNCTIONS
+#----------------------------------------------------------------------
+
+
+#-----------------------------------------------------------------------
+# CARSON COUNTY TRANSFORMATION
+#-----------------------------------------------------------------------
 
 # get staging feature class and name output transformed feature class
 in_features = "Parcel_CC_Extracted"
