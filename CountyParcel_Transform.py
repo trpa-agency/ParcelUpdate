@@ -23,7 +23,568 @@ This script runs on the 16th of each month at 1am on Arc10 from scheduled task "
 #----------------------------------------------------------------------
 # FUNCTIONS
 #----------------------------------------------------------------------
+# import packages
+import urllib
+import json
+import requests
+import os
+import shutil
+import sys
+import re
+import logging
 
+from datetime import datetime 
+import time
+from zipfile import ZipFile
+from io import BytesIO
+
+import pandas as pd
+import pyodbc
+
+import arcpy
+from arcgis.features import GeoAccessor, GeoSeriesAccessor
+from arcgis.gis import GIS
+
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+# import traceback
+# from pytz import timezone
+# import pytz
+import pathlib
+# from IPython.display import display
+# import getpass
+from time import strftime
+# import linecache
+# import ssl
+
+# environment settings
+arcpy.env.workspace = "//Trpa-fs01/GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb"
+arcpy.env.overwriteOutput = True
+arcpy.env.outputCoordinateSystem = arcpy.SpatialReference(26910)
+
+# set workspace and sde connections 
+workspace = "//Trpa-fs01/GIS/PARCELUPDATE/Workspace/Staging"
+
+# network path to connection files
+filePath = "//Trpa-fs01/GIS/PARCELUPDATE/Workspace/"
+# database file path 
+sdeBase    = os.path.join(filePath, "Vector.sde/")
+sdeCollect = os.path.join(filePath, "Collection.sde")
+sdeTabular = os.path.join(filePath, "Tabular.sde")
+
+# portal signin
+## TRPA_ADMIN credentials 
+portal_user = "TRPA_PORTAL_ADMIN"
+portal_pwd = "@dmin6224"
+portal_url = "https://maps.trpa.org/portal/"
+# sign in
+arcpy.SignInToPortal(portal_url, portal_user, portal_pwd)
+
+### Functions ###
+# time a function function
+## use as decorator @timer
+def timer(func):
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        print(f"Function {func.__name__} took {end_time - start_time} seconds to execute.")
+        return result
+    return wrapper
+
+# set none to '' for all cells
+@timer
+def replace_null_values_with_blank(fc):
+    field_list = get_text_fields(fc)
+    with arcpy.da.UpdateCursor(fc, field_list) as cursor: 
+        for row in cursor: 
+            for i in range(len(row)): 
+                if row[i] is None: 
+                    row[i] = "" 
+            cursor.updateRow(row)
+            
+@timer           
+def UpdateFieldFromDictionary(featureclass, field, update_dictionary):
+    record_count = 0
+    with arcpy.da.UpdateCursor(featureclass, field) as cursor:
+        for row in cursor:
+            key_field_value = row[0]
+            if key_field_value in update_dictionary:
+                row[0] = update_dictionary[key_field_value]
+                cursor.updateRow(row)
+                record_count+=record_count
+    print(f"{record_count} rows were updated")
+                    
+# combine duplicate records, creating multipart and dissolved polygons 
+@timer
+def CombineAPNs(fc, fld_dissolve):    
+    from time import strftime  
+    print ("Started combining APNs: " + strftime("%Y-%m-%d %H:%M:%S"))
+
+    # get unique values from field
+    value_list = [r[0] for r in arcpy.da.SearchCursor(fc, (fld_dissolve))]
+    unique_vals = list(set(value_list))
+    
+    if len(value_list) !=len(unique_vals):
+        seen = set()
+        dup_vals = set()
+        for x in value_list:
+            if x in seen:
+                dup_vals.add(x)
+            else:
+                seen.add(x)
+        print(dup_vals)
+        dup_vals.remove('')
+        for unique_val in dup_vals:
+            geoms = [r[0] for r in arcpy.da.SearchCursor(fc, ('SHAPE@', fld_dissolve)) if r[1] == unique_val]
+            #Probably don't need this as there will always be more than one geometry
+            if len(geoms) > 1:
+                print(unique_val)    
+                diss_geom = DissolveGeoms(geoms)
+
+                # update the first feature with new geometry and delete the others
+                where = "{} = '{}'".format(fld_dissolve, unique_val)
+                cnt = 0
+                with arcpy.da.UpdateCursor(fc, ('SHAPE@'), where) as curs:
+                    for row in curs:
+                        cnt += 1
+                        if cnt == 1:
+                            row[0] = diss_geom
+                            curs.updateRow(row)
+                        else:
+                            curs.deleteRow()
+    else:
+        print("No duplicates!")
+    print ("Finished combining APNs: " + strftime("%Y-%m-%d %H:%M:%S"))
+    
+# union all geometry inputs into one dissolved geometry
+@timer
+def DissolveGeoms(geoms):
+    cnt = 0
+    for geom in geoms:
+        cnt += 1
+        if cnt == 1:
+            diss_geom = geom
+        else:
+            diss_geom = diss_geom.union(geom)
+    return diss_geom
+
+# moves attribute values from one feature class to the other using an aspatial join
+@timer
+def fieldJoinCalc(updateFC, updateFieldsList, sourceFC, sourceFieldsList):
+    from time import strftime  
+    print ("Started data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
+#     log.info("Started data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
+    # Use list comprehension to build a dictionary from arcpy SearchCursor  
+    valueDict = {r[0]:(r[1:]) for r in arcpy.da.SearchCursor(sourceFC, sourceFieldsList)}  
+   
+    with arcpy.da.UpdateCursor(updateFC, updateFieldsList) as updateRows:  
+        for updateRow in updateRows:  
+            # store the Join value of the row being updated in a keyValue variable  
+            keyValue = updateRow[0]  
+            # verify that the keyValue is in the Dictionary  
+            if keyValue in valueDict:  
+                # transfer the value stored under the keyValue from the dictionary to the updated field.  
+                updateRow[1] = valueDict[keyValue][0]  
+                updateRows.updateRow(updateRow)    
+    del valueDict  
+    print ("Finished data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
+#     log.info("Finished data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
+
+# transfer attributes frome one feature class field to another while using multiple fields to create the keys
+@timer
+def fieldJoinCalc_multikey(updateFC, updateFieldsList_key, updateFieldsList_value, sourceFC, sourceFieldsList_key, sourceFieldsList_value):
+    from time import strftime  
+    print ("Started data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
+#     log.info("Started data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
+    # Use list comprehension to build a dictionary from arcpy SearchCursor  
+    total_count=0
+    valueDict = {(r[0]+r[1]):(r[2]) for r in arcpy.da.SearchCursor(sourceFC, (sourceFieldsList_key + sourceFieldsList_value))}  
+    with arcpy.da.UpdateCursor(updateFC, (updateFieldsList_key+ updateFieldsList_value)) as updateRows:  
+        for updateRow in updateRows:  
+            # store the Join value of the row being updated in a keyValue variable  
+            keyValue = updateRow[0]+updateRow[1]
+            # verify that the keyValue is in the Dictionary  
+            if keyValue in valueDict:
+                total_count +=1
+                if (total_count%1000)==0:
+                    print (f"Updating row {total_count}")
+                # transfer the value stored under the keyValue from the dictionary to the updated field.  
+                updateRow[2] = valueDict[keyValue]  
+                updateRows.updateRow(updateRow)    
+    del valueDict  
+    print ("Finished data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
+#     log.info("Finished data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
+
+# find attribute level differences in two identical data frames
+#Gonna have to make this a compound key as well - need to handle duplicate APNs?
+@timer
+def differenceDictionary(df1, df2, key_field, fields_to_ignore):
+    #Generate a list of columns in common
+    common_columns = list(set(df1.columns) & set(df2.columns))
+    # keep only the common columns in both dataframes
+    df1 = df1[common_columns]
+    df2 = df2[common_columns]
+    #Trim spaces
+    df1 = df1.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+    df2 = df2.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+    
+    #Force the column types to match
+    for field in fields_to_ignore:
+        df1 = df1.drop(field, axis=1)
+        df2 = df2.drop(field, axis=1)
+    for column in df2.columns:
+        if df1[column].dtype != df2[column].dtype:
+            print(column)
+            print (df2[column].dtype)
+            #This handles nulls
+            if df1[column].dtype=='int64':
+                df1[column]=df1[column].astype('Int64')
+            df2.loc[:, column] = df2[column].astype(df1[column].dtype)
+    #    
+    df1 = df1.set_index(key_field)
+    df2 = df2.set_index(key_field)
+    df1.sort_index(inplace=True)
+    df2.sort_index(inplace=True)
+    common_columns = list(set(df1.columns) & set(df2.columns))
+    df1 = df1[common_columns]
+    df2 = df2[common_columns]
+    diff_df = df1.compare(df2)
+    #
+    new_values =diff_df.loc[:,pd.IndexSlice[:,'other']].droplevel(1,axis=1)
+    #
+    dict_update = new_values.to_dict('index')
+    #
+    new_dict = {k: {a: b for a, b in v.items() if not pd.isnull(b)} 
+                for k, v in dict_update.items()}
+    keys_to_remove = []
+    for outer_key, inner_dict in new_dict.items():
+        inner_keys_to_remove = []
+        for inner_key, value in inner_dict.items():
+            if not value:
+                inner_keys_to_remove.append(inner_key)
+        for inner_key in inner_keys_to_remove:
+            del inner_dict[inner_key]
+        if not inner_dict:
+            keys_to_remove.append(outer_key)
+
+    for outer_key in keys_to_remove:
+        del new_dict[outer_key]
+    return new_dict
+
+# use the differences dictionary to update attributes in feature service or feature class
+@timer
+def update_fc_from_dict(update_dict,key_field, fc):
+    #This gets our update cursor down to fields that need to be updated
+    update_fields = set(field for values in update_dict.values() for field in values.keys())
+    # create a SQL query to filter the feature class based on the key field values
+    key_field_values = tuple(update_dict.keys())
+    print("Updating Attributes started: " + strftime("%Y-%m-%d %H:%M:%S"))
+    # update the attributes using the nested dictionary
+    apn_issues =list()
+    with arcpy.da.UpdateCursor(fc, [key_field] + list(update_fields)) as cursor:
+        total_count=0
+        for row in cursor:
+            key_field_value = row[0]
+            if key_field_value in update_dict:
+                try:
+                    update_values = update_dict[key_field_value]
+                    total_count +=1
+                    if (total_count%1000)==0:
+                        print (f"Updating row {total_count} at "+ strftime("%Y-%m-%d %H:%M:%S"))
+                    for field, value in update_values.items():
+                        index = cursor.fields.index(field)
+                        row[index] = value
+                    cursor.updateRow(row)
+                        #print("Updated APN/Field: "+str(row[0])+" / "+str(field))
+                except Exception as e:
+                    apn_issues.append(key_field_value)
+                    # Print the error message
+                    print(f"Error updating {key_field_value}: {e}")
+                    continue
+    print("Updating Attributes Finished: " + strftime("%Y-%m-%d %H:%M:%S"))
+    print(f"Total updated{total_count}")
+    return apn_issues
+
+#Seperated out into two functions so we can use this function to make old new table in SQL
+@timer
+def make_old_new_dataframe(old_feature_class, new_feature_class, TRPA_boundary, prefix_remove):
+    df_old = pd.DataFrame.spatial.from_featureclass(old_feature_class)
+    df_new = pd.DataFrame.spatial.from_featureclass(new_feature_class)
+    df_merge = pd.merge(df_old, df_new,  how='outer', on=['APN'], indicator=True)
+    df_merge.query('_merge!="both"', inplace=True)
+    df_merge.loc[df_merge['_merge']=='right_only', 'Status']='New APN'
+    # define Left Only as Old APNs
+    df_merge.loc[df_merge['_merge']=='left_only', 'Status']='Old APN'
+    df_merge.dropna(subset=['APN'], inplace=True) 
+    df_merge = df_merge.loc[~df_merge['APN'].str.startswith(prefix_remove)]
+    #
+    date = time.strftime("%m%d%Y")
+    df_merge['DiscoveryDate'] = date
+    df_merge['DiscoveryDate'] = pd.to_datetime(df_merge['DiscoveryDate'], format='%m%d%Y')
+    TRPA_BNDY_Fields = [col for col in df_merge.columns if 'WITHIN_TRPA_BNDY' in col]
+    df_merge['TRPA_Boundary'] = df_merge[TRPA_BNDY_Fields].sum(axis=1)
+    # final list of fields
+    df_merge = df_merge[['APN','Status','DiscoveryDate','TRPA_Boundary']]
+    if TRPA_boundary == 'Yes':
+        df_merge = df_merge.loc[df_merge['TRPA_Boundary']>=1]
+    return df_merge
+
+# get the list of old and new parcels
+#Think this through to handle duplicate APNs
+@timer
+def old_new_parcels_list(old_feature_class, 
+                         new_feature_class, 
+                         TRPA_boundary, 
+                         prefix_remove, 
+                         old_new):
+    df_merge = make_old_new_dataframe(old_feature_class, new_feature_class, TRPA_boundary, prefix_remove)
+    parcel_list = df_merge.loc[df_merge['Status']==old_new,'APN'].tolist()
+    return parcel_list
+
+#Identify differences between APNs that haven't changed
+@timer
+def return_matching_apns(feature_class_old, 
+                         feature_class_new, 
+                         parcels_ignore):
+    dfOld = pd.DataFrame.spatial.from_featureclass(feature_class_old)
+    dfOld = dfOld[~dfOld['APN'].isin(parcels_ignore['APN'])]
+    dfNew = pd.DataFrame.spatial.from_featureclass(feature_class_new)
+    dfNew = dfNew.loc[dfNew['WITHIN_TRPA_BNDY']==1]
+    matching_apns  = pd.merge(dfOld, dfNew,  how='inner', on=['APN'])
+    matching_apns =pd.unique(matching_apns['APN'])
+    return matching_apns
+
+# deletes parcels
+@timer
+def delete_old_parcels(featureLayer, oldAPNs):
+    delete_count = 0
+    with arcpy.da.UpdateCursor(featureLayer, ["APN"]) as cursor:
+        for row in cursor:
+            apn = row[0]
+            if apn in oldAPNs:
+                cursor.deleteRow()
+                delete_count +=1
+    print(f"{delete_count} rows deleted from {featureLayer}.")
+
+# inserts new parcels
+@timer
+def insert_new_parcels(featureLayer, new_APNs, new_parcels, fields):
+    new_count = 0
+    where_clause = f"{arcpy.AddFieldDelimiters(featureLayer, 'APN')} IN "+str(tuple(new_APNs))
+    print(where_clause)
+    with arcpy.da.SearchCursor(new_parcels, fields, where_clause) as search_cursor:
+    # Open an insert cursor to the destination feature class
+        with arcpy.da.InsertCursor(featureLayer, fields) as insert_cursor:
+            # insert the rows from the serach cursor
+            for row in search_cursor:
+                insert_cursor.insertRow(row)
+                new_count +=1
+                print(f"{new_count} rows inserted into {featureLayer}.")
+                
+# updates @SHAPE that aren't identical to existing shapes
+@timer
+def update_parcel_geometry(featureLayer, new_parcels):
+    newShapes = arcpy.management.SelectLayerByLocation(
+    in_layer=new_parcels,
+    overlap_type="ARE_IDENTICAL_TO",
+    select_features=featureLayer,
+    search_distance=None,
+    selection_type="NEW_SELECTION",
+    invert_spatial_relationship="INVERT")
+    # update SHAPE object with new value
+    #Changed this to Jurisdiction to work with Parcel_Base
+    updateFieldsList_key= ['APN', 'JURISDICTION']
+    updateFieldsList_value = ['SHAPE@']
+    sourceFieldsList_key = ['APN', 'JURISDICTION']
+    sourceFieldsList_value = ['SHAPE@']
+    fieldJoinCalc_multikey(featureLayer, updateFieldsList_key, updateFieldsList_value, newShapes, sourceFieldsList_key, sourceFieldsList_value)
+
+    # Get the count of selected features
+    result = arcpy.management.GetCount(newShapes)
+    count = int(result.getOutput(0))
+    # number of shapes shifted
+    print(f"{count} shapes shifted.")
+    
+@timer
+def generate_spatial_dataframe(feature_class, data_type_mapping, fields_to_exclude): 
+    # Get the field names and data types
+    fields = arcpy.ListFields(feature_class)
+    field_names = [field.name for field in fields if field.name not in fields_to_exclude]
+    field_data_types = {field.name: field.type for field in fields if field.name not in fields_to_exclude}
+
+    # Create a dictionary to store the data
+    data = {}
+
+    # Iterate through the rows and populate the dictionary
+    with arcpy.da.SearchCursor(feature_class, field_names) as cursor:
+        for row in cursor:
+            for i, field_name in enumerate(field_names):
+                if field_name not in data:
+                    data[field_name] = []
+                data_type = data_type_mapping.get(field_data_types[field_name], str)
+                if row[i] is not None:
+                    data[field_name].append(data_type(row[i]))
+                else:
+                    data[field_name].append(row[i])
+
+    # Create a pandas DataFrame from the dictionary
+    df = pd.DataFrame(data)
+
+    return df
+
+def get_text_fields(feature_class):
+    field_list = []
+    fields = arcpy.ListFields(feature_class)
+    for field in fields:
+        if field.type == 'String':
+            field_list.append(field.name)
+    return field_list
+
+# Parcel AOI to select parcels to keep (includes TRPA Boundary and Olympic Valley Watershed)
+parcelAOI = "Parcel_AOI"
+
+#sde feature classes to use in attribution stage
+sde_Impervious       = sdeBase + "\\sde.SDE.Impervious\\sde.SDE.Impervious_2019"
+sde_Bailey           = sdeBase + "\\sde.SDE.Soils\sde.SDE.land_capability_Bailey_Soils"
+sde_RegionalLandUse  = os.path.join(sdeBase,"sde.SDE.Planning/sde.SDE.RegionalLandUse")
+sde_NRCSSoils1974    = sdeBase + "\\sde.SDE.Soils\\sde.SDE.NRCS_Soils_1974"
+sde_NRCSSoils2003    = sdeBase + "\\sde.SDE.Soils\\sde.SDE.NRCS_Soils_2003"
+sde_Catchment        = sdeBase + "\\sde.SDE.WaterQuality\\sde.SDE.TMDL_Catchment"
+sde_HydroArea        = sdeBase + "\\sde.SDE.Water\\sde.SDE.Hydro_Areas"
+sde_Watershed        = sdeBase + "\\sde.SDE.Water\\sde.SDE.Watershed"
+sde_FireDistrict     = sdeBase + "\\sde.SDE.Jurisdictions\\sde.SDE.FireDistricts"
+sde_LocalPlan        = sdeBase + "\\sde.SDE.Planning\\sde.SDE.LocalPlan"
+sde_SpecialDistrict  = sdeBase + "\\sde.SDE.Planning\\sde.SDE.SpecialPlanningDistrict"
+sde_CSLT             = sdeBase + "\\sde.SDE.Jurisdictions\\sde.SDE.CSLT"
+sde_CurrentParcels   = sdeBase + "\\sde.SDE.Parcels\\sde.SDE.Parcel_Master"
+sde_Zoning           = sdeBase + "\\sde.SDE.Planning\\sde.SDE.District"
+sde_TownCenter       = sdeBase + "\\sde.SDE.Planning\\sde.SDE.TownCenter"
+sde_TownCenterBuffer = sdeBase + "\\sde.SDE.Planning\\sde.SDE.TownCenter_Buffer"
+sde_Index1987        = sdeBase + "\\sde.SDE.Index\\sde.SDE.AssessorMapIndex_1987"
+sde_TRPAboundary     = sdeBase + "\\sde.SDE.Jurisdictions\\sde.SDE.TRPA_bdy"
+sde_BonusUnitboundary= sdeBase + "\\sde.SDE.Planning\\sde.SDE.Bonus_unit_boundary"
+sde_UrbanArea        = sdeBase + "\\sde.SDE.Jurisdictions\\sde.SDE.UrbanAreas"
+sde_Zip              = sdeBase + "\\sde.SDE.Jurisdictions\\sde.SDE.Postal_ZIP"
+sde_TAZ              = sdeBase + "\\sde.SDE.Transportation\\sde.SDE.Transportation_Analysis_Zone"
+sde_Littoral         = sdeBase + "\\sde.SDE.Shorezone\\sde.SDE.LittoralParcel"
+sde_Tolerance        = sdeBase + "\\sde.SDE.Shorezone\\sde.SDE.Tolerance_District"
+
+# in memory fcs to use in the attribution stage
+memory = "memory" + "\\"
+ParcelPoint_RegionalLandUse = memory + "ParcelPoint_RegionalLandUse"
+ParcelPoint_Soils74         = memory + "ParcelPoint_Soils74"
+ParcelPoint_Soils03         = memory + "ParcelPoint_Soils03"
+ParcelPoint_Catchment       = memory + "ParcelPoint_Catchment"
+ParcelPoint_HydroArea       = memory + "ParcelPoint_HydroArea"
+ParcelPoint_Watershed       = memory + "ParcelPoint_Watershed"
+ParcelPoint_FireDistrict    = memory + "ParcelPoint_FireDistrict"
+ParcelPoint_LocalPlan       = memory + "ParcelPoint_LocalPlan"
+ParcelPoint_TownCenter      = memory + "ParcelPoint_TownCenter"
+ParcelPoint_TownCenterBuffer= memory + "ParcelPoint_TownCenterBuffer"
+ParcelPoint_Zoning          = memory + "ParcelPoint_Zoning"
+ParcelPoint_SpecialDistrict = memory + "ParcelPoint_SpecialDistrict"
+ParcelPoint_Index1987       = memory + "ParcelPoint_Index1987"
+ParcelPoint_PstlTown        = memory + "ParcelPoint_PstlTown"
+ParcelPoint_PstlZip         = memory + "ParcelPoint_PstlZip"
+ParcelPoint_CSLT            = memory + "ParcelPoint_CSLT"
+ParcelPoint_TAZ             = memory + "ParcelPoint_TAZ"
+ParcelPoint_Design          = memory + "ParcelPoint_Design"
+ParcelPoint_Littoral        = memory + "ParcelPoint_Littoral"
+ParcelPoint_Tolerance       = memory + "ParcelPoint_Tolerance"
+
+# Set up fields to add to FGDB.
+baseFields = [
+# apn ppno
+['APN_TRPA', 'TEXT', 'APN', 50],
+['PPNO_TRPA', 'DOUBLE','PPNO'],
+['JURISDICTION_TRPA', 'TEXT', 'Jurisdiction', 4],
+['COUNTY_TRPA', 'TEXT', 'County', 2],
+ # parcel address   
+['HSE_NUMBR_TRPA', 'TEXT', 'House Number', 25],
+['UNIT_NUMBR_TRPA', 'TEXT', 'Unit Number', 50],
+['STR_DIR_TRPA', 'TEXT','Street Direction', 5],
+['STR_NAME_TRPA', 'TEXT', 'Street Name', 100],
+['STR_SUFFIX_TRPA', 'TEXT', 'Street Suffix', 6],
+['APO_ADDRESS_TRPA', 'TEXT', 'Full Address', 100],
+['PSTL_TOWN_TRPA', 'TEXT', 'Postal Town', 25],
+['PSTL_STATE_TRPA', 'TEXT', 'Postal State', 2],
+['PSTL_ZIP5_TRPA', 'TEXT', 'Postal Zip Code', 5],
+# owner info
+['OWN_FIRST_TRPA', 'TEXT', 'Owner First Name', 255],
+['OWN_LAST_TRPA', 'TEXT', 'Owner Last Name', 255],
+['OWN_FULL_TRPA', 'TEXT', 'Owner Name', 255],
+    # swap this in soon
+# ['OWNER_NAME_TRPA', 'TEXT', 'Owner Name', 255],
+['MAIL_ADD1_TRPA', 'TEXT', 'Mailing Address', 100],
+['MAIL_CITY_TRPA', 'TEXT', 'Mailing City', 50],
+['MAIL_STATE_TRPA', 'TEXT', 'Mailing State', 25],
+['MAIL_ZIP5_TRPA', 'TEXT', 'Mailing Zip Code', 5],
+# value fields  
+['AS_LANDVALUE_TRPA', 'LONG','Assessed Land Value'],
+['AS_IMPROVALUE_TRPA', 'LONG','Assessed Improved Value'],
+['AS_SUM_TRPA', 'LONG', 'Assessed Sum Value'],
+['TAX_LANDVALUE_TRPA', 'LONG','Tax Land Value'],
+['TAX_IMPROVALUE_TRPA', 'LONG','Tax Improved Value'],
+['TAX_SUM_TRPA', 'LONG','Tax Sum'],
+['TAX_YEAR_TRPA', 'TEXT','Tax Year', 5],
+# jurisdiction land use fields
+['COUNTY_LANDUSE_CODE_TRPA', 'TEXT', 'County Landuse Code', 50],
+['COUNTY_LANDUSE_TRPA', 'TEXT', 'County Landuse', 250],
+# Fields for building info
+["YEAR_BUILT_TRPA", "SHORT", 'Year Built', 5],
+['UNITS_TRPA', 'DOUBLE', 'Units', 5],
+["BEDROOMS_TRPA", "DOUBLE",'Bedrooms'],
+['BATHROOMS_TRPA', 'DOUBLE', 'Bathrooms'],
+['BUILDING_SQFT_TRPA', 'DOUBLE', 'Building Size'],
+# fields to add? 
+["VHR_TRPA", "TEXT", "Vacation Home Rental", 3],
+["HOA_TRPA", "TEXT", "Home Owners Association", 3]
+]
+
+trpaFields = [
+# land use
+['OWNERSHIP_TYPE_TRPA', 'TEXT', 'Ownership Type', 50],
+['EXISTING_LANDUSE_TRPA', 'TEXT', 'Existing Landuse', 50],
+['REGIONAL_LANDUSE_TRPA', 'TEXT', 'Regional Landuse', 50], 
+# Fields for soil, watershed, etc...
+['ESTIMATED_COVERAGE_ALLOWED_TRPA', 'DOUBLE', "Estimate of Coverage Allowed (Bailey, sq.ft.)"],
+['IMPERVIOUS_SURFACE_SQFT_TRPA', 'DOUBLE', "Impervious Surface (Remote Sensing, sq.ft.)"],
+['SOIL_1974_TRPA', 'TEXT','NRCS Soils 1974', 5],
+["SOIL_2003_TRPA", "TEXT", "NRCS Soils 2003", 5],
+["CATCHMENT_TRPA", "TEXT", "Catchment", 150],
+["HRA_NAME_TRPA", "TEXT", "Hydrologic Resource Area", 30],
+["WATERSHED_NUMBER_TRPA", "SHORT", "Watershed Number"],
+["WATERSHED_NAME_TRPA", "TEXT", "Watershed Name", 30],
+["PRIORITY_WATERSHED_TRPA", "TEXT", "Priority Watershed", 2],
+["FIREPD_TRPA", "TEXT", "Fire Protection District", 25],
+# Fields for Planning purposes
+["PLAN_ID_TRPA", "TEXT", 'Plan ID',8],
+["PLAN_NAME_TRPA", "TEXT", 'Plan Name', 40],
+["PLAN_TYPE_TRPA", "TEXT", 'Plan Type', 40],
+["ZONING_ID_TRPA", "TEXT", 'Zoning ID', 50],
+["ZONING_DESCRIPTION_TRPA", "TEXT", 'Zoning Description',500],
+["TOWN_CENTER_TRPA", "TEXT",'Town Center', 50],
+["LOCATION_TO_TOWNCENTER_TRPA", "TEXT", 'Location Relative to Town Center', 50],
+["TOLERANCE_ID_TRPA", "TEXT", 'Tolerance ID', 50],
+["TAZ_TRPA", "DOUBLE",'Transportation Analysis Zone'],
+["INDEX_1987_TRPA", "TEXT", "1987 Parcel Map Index",10],
+["LITTORAL_TRPA", "SHORT", "Littoral"],
+["WITHIN_TRPA_BNDY_TRPA", "SHORT","Within TRPA Boundary?"],
+["WITHIN_BONUSUNIT_BNDY_TRPA", "SHORT", "Within Bonus Unit Boundary"],
+["LOCAL_PLAN_HYPERLINK_TRPA", "TEXT", "Local Plan Hyperlink", 255],
+["DESIGN_GUIDELINES_HYPERLINK_TRPA", "TEXT", "Design Guidelines", 255],
+["LTINFO_HYPERLINK_TRPA", "TEXT", "LTinfo Parcel Details", 255],
+["INDEX_1987_HYPERLINK_TRPA", "TEXT", "Index 1987 Hyperlink", 255],
+# Fields for Parcel Size
+["PARCEL_ACRES_TRPA", "DOUBLE", "Acres"],
+["PARCEL_SQFT_TRPA", "DOUBLE", "Square Feet"] 
+]
+
+#----------------------------------------------------------------------
+# LOGGING
+#----------------------------------------------------------------------
 
 #-----------------------------------------------------------------------
 # CARSON COUNTY TRANSFORMATION
