@@ -26,17 +26,14 @@ import os
 import shutil
 import sys
 import logging
-
 from datetime import datetime
 import time
 from zipfile import ZipFile
 from io import BytesIO
-
 import arcpy
-
+import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-
 import pathlib
 from time import strftime
 
@@ -82,10 +79,7 @@ log.write("\n")
 # start timer for the get data requests
 startTimer = datetime.datetime.now()
 
-# report how long it took to get the data
-endTimer = datetime.datetime.now() - startTimer
-print("\nTime it took to get the data: {}".format(endTimer))   
-log.write("\nTime it took to get the data: {}".format(endTimer)) 
+
 #---------------------------------------------------------------------------------------#
 ## Define Functions ##
 #---------------------------------------------------------------------------------------#
@@ -145,11 +139,13 @@ try:
 
     # delete the existing table
     arcpy.management.Delete('Parcel_CC_Features')
-    print("Deleted existing table")
+    print("Deleted existing Carson City County Feature Class")
+    log.write("Deleted existing Carson City County Feature Class")
 
     # json object to table
     arcpy.JSONToFeatures_conversion(json_path, 'Parcel_CC_Features')
     print("Saved CC Staging Feature class")
+    log.write("Deleted existing Carson City County Feature Class")
 
     # get data from rest service
     params = {'where': '1=1', 'outFields': '*', 'f': 'pjson', 'returnGeometry': True}
@@ -169,11 +165,12 @@ try:
     # delete the existing table
     arcpy.management.Delete('Parcel_CC_Table')
     print("Deleted existing table")
+    log.write("Deleted existing table")
 
     # json object to table
     arcpy.JSONToFeatures_conversion(json_path, 'Parcel_CC_Table')
     print("Saved CC Staging Table")
-
+    log.write("Saved CC Staging Table")
 
     # The qualifiedFieldNames environment is used by Copy Features when persisting 
     # the join field names.
@@ -194,11 +191,12 @@ try:
     # Copy the joined layer to a new permanent feature class
     arcpy.management.CopyFeatures(cc_join, outFeature)
     print("Carson Parcels Extracted")
+    log.write("Carson Parcel Extracted")
     #---------------------------------------------------------------------------------------#
     # report how long it took to get the data
     endTimer = datetime.datetime.now() - startTimer
-    print("\nTime it took to update Collection SDE feature classes: {}".format(endTimer)) 
-    log.write("\nTime it took to update Collection SDE feature classes: {}".format(endTimer)) 
+    print("\nTime it took to update Carson feature classes: {}".format(endTimer)) 
+    log.write("\nTime it took to update Carson feature classes: {}".format(endTimer)) 
 
     #---------------------------------------------------------------------------------------#
     # DOUGLAS EXTRACT
@@ -214,6 +212,7 @@ try:
     js = json.load(j)
     maxrc = int(js["maxRecordCount"])
     print("Record extract limit: %s" % maxrc)
+    log.write("Record extract limit: %s" % maxrc)
 
     # Get object ids of features
     where = "1=1"
@@ -225,6 +224,7 @@ try:
     idlist.sort()
     numrec = len(idlist)
     print("Number of target records: %s" % numrec)
+    log.write("Number of target records: %s" % numrec)
 
     # Gather features
     print ("Gathering records...")
@@ -236,7 +236,8 @@ try:
         fromid = idlist[i]
         toid = idlist[torec]
         where = "{} >= {} and {} <= {}".format(idfield, fromid, idfield, toid)
-        print ("  {}".format(where))
+        print("{}".format(where))
+        log.write("{}".format(where))
         urlstring = baseURL + "/query?where={}&returnGeometry=true&outFields={}&f=json".format(where,fields)
         # build that feature set!
         fs[i] = arcpy.FeatureSet()
@@ -250,6 +251,7 @@ try:
     arcpy.Merge_management(fslist, outfc)
 
     print("Douglas Parcels Extracted")
+    log.write("Douglas Parcels Extracted")
 
     #---------------------------------------------------------------------------------------#
     # EL DORADO EXTRACT
@@ -263,13 +265,13 @@ try:
     existingZip = pathlib.Path(zipPath + r"\zipfolder")
     if existingZip.exists():
         shutil.rmtree(zipPath + r"\zipfolder")
-        logging.info('Previous zip folder deleted')
+        log.write('Previous zip folder deleted')
 
     # Setup the params for the extraction GP tool. The boundary is a polygon the grabs the whole county.
     payload = {'f': 'json', 'env:outSR': '6418', 'Layers_to_Clip': '["Parcels"]', 'Area_of_Interest': '{"geometryType":"esriGeometryPolygon","features":[{"geometry":{"rings":[[[-13490599.294393552,4646257.881632805],[-13490599.294393552,4735689.204726496],[-13336502.24537058,4735689.204726496],[-13336502.24537058,4646257.881632805],[-13490599.294393552,4646257.881632805]]],"spatialReference":{"wkid":102100}}}],"sr":{"wkid":102100}}', 'Feature_Format': 'File Geodatabase - GDB - .gdb'}
 
     # Make the request to the GP service.
-    logging.info('Requesting parcels from EDC')
+    log.write('Requesting parcels from EDC')
     job = requests.get(r"https://see-eldorado.edcgov.us/arcgis/rest/services/uGOTNETandEXTRACTS/geoservices/GPServer/Extract%20Data%20Task/submitJob",params=payload)
     jobJson = job.json()
 
@@ -279,7 +281,7 @@ try:
         jobStatus = jobJson['jobStatus']
         jobURL = r"https://see-eldorado.edcgov.us/arcgis/rest/services/uGOTNETandEXTRACTS/geoservices/GPServer/Extract%20Data%20Task/jobs"
         if jobStatus == 'esriJobSubmitted' or jobStatus == 'esriJobExecuting':
-            logging.info('EDC job submitted')
+            log.write('EDC job submitted')
 
         # Check the status of the job, when done grab the resulting ZIP file link.
         while jobStatus == 'esriJobSubmitted' or jobStatus == 'esriJobExecuting':
@@ -465,6 +467,42 @@ try:
     ## END OF EXTRACT ##
     ##--------------------------------------------------------------------------------------------------------#
 
+    ##--------------------------------------------------------------------------------------------------------#
+    ## DELETE Parcels outside of the Tahoe Basin ##
+    ##--------------------------------------------------------------------------------------------------------#
+    # list of parcel staging layers to trim
+    parcelLayers = ["Parcel_CC_Extracted",
+                    "Parcel_DG_Extracted",
+                    "Parcel_EL_Extracted",
+                    "Parcel_PL_Extracted",
+                    "Parcel_WA_Extracted"]
+
+    # delete BS Parcels
+    parcelDelete = "ParcelDelete"
+
+    for parcel in parcelLayers:
+        # Run MakeFeatureLayer
+        arcpy.management.MakeFeatureLayer(parcel, parcelDelete)
+        # select within clementini 
+        arcpy.management.SelectLayerByLocation(parcelDelete, 
+                                            "INTERSECT", 
+                                            # includes TRPA Boundary and Olympic Valley Wateshed
+                                            parcelAOI, '0', 
+                                            "NEW_SELECTION", "INVERT")
+
+        # Run GetCount and if some features have been selected, then 
+        #  run DeleteFeatures to remove the selected features.
+        deleteCount=arcpy.management.GetCount(parcelDelete)[0]
+        if int(deleteCount) > 0:
+            arcpy.management.DeleteFeatures(parcelDelete)
+        # delete feature layer
+        arcpy.management.Delete(parcelDelete)
+        print("{} features deleted".format(deleteCount))
+        log.write("{} features deleted".format(deleteCount))
+    ##--------------------------------------------------------------------------------------------------------#
+    ## Send Email with Log ##
+    ##--------------------------------------------------------------------------------------------------------#
+    
     # report how long it took to run the script
     FINALendTimer = datetime.datetime.now() - FIRSTstartTimer
     print ("\nTime it took to run this script: {}".format(FINALendTimer))
@@ -492,7 +530,7 @@ except arcpy.ExecuteError:
 except Exception:
     e = sys.exc_info()[1]
     print(e.args[0])
-    log.write(e)
+    log.write(e.args[0])
     log.close()
     
     header = "ERROR - System Error - Check Log"
