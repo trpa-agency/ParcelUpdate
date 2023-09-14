@@ -440,6 +440,7 @@ fields_to_ignore = ['PARCEL_SQFT', 'PPNO', 'ESTIMATED_COVERAGE_ALLOWED', 'IMPERV
 # get the differences as dictionaries
 differences_master = differenceDictionary(dfparcelMaster, dfparcelNew, 'APN', fields_to_ignore)
 
+differences_master.to_csv("Differences_List.csv")
 
 # function to update attributes
 # This can take a minute - CHANGE TO WRITE TO CSV?
