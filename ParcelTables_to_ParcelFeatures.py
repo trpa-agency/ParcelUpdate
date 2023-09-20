@@ -22,7 +22,9 @@ import arcpy
 from datetime import datetime
 import os
 import sys
-import pyodbc
+from sqlalchemy.engine import URL
+from sqlalchemy import create_engine
+import sqlalchemy as sa
 import pandas as pd
 from arcgis.features import FeatureSet, GeoAccessor, GeoSeriesAccessor
 import smtplib
@@ -71,10 +73,18 @@ log.write("\n")
 # start timer for the get data requests
 startTimer = datetime.now()
 
-# make sql database connection to BMP with pyodbc
-bmpConnect = pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server};SERVER=sql14;DATABASE=tahoebmpsde;UID=sde;PWD=staff')
-# BMP - create dataframe from tahoebmpsde table
-dfBMP      = pd.read_sql("SELECT * FROM tahoebmpsde.dbo.v_BMPStatus", bmpConnect)
+#
+connection_string = "DRIVER={ODBC Driver 17 for SQL Server};SERVER=sql14;DATABASE=tahoebmpsde;UID=sde;PWD=staff"
+connection_url = URL.create("mssql+pyodbc", query={"odbc_connect": connection_string})
+engine = create_engine(connection_url)
+
+with engine.begin() as bmpConnect:
+    dfBMP      = pd.read_sql("SELECT * FROM tahoebmpsde.dbo.v_BMPStatus", bmpConnect)
+
+# # make sql database connection to BMP with pyodbc
+# bmpConnect = pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server};SERVER=sql14;DATABASE=tahoebmpsde;UID=sde;PWD=staff')
+# # BMP - create dataframe from tahoebmpsde table
+# dfBMP      = pd.read_sql("SELECT * FROM tahoebmpsde.dbo.v_BMPStatus", bmpConnect)
 
 # # make sql database connection to Accela with pyodbc
 # accConnect = pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server};SERVER=ASQL;DATABASE=Accela;UID=BMP_Update;PWD=BMP_update_123')
@@ -170,158 +180,158 @@ def updateSDE(inputfc,outfc, fieldnames):
 try:
     #---------------------------------------------------------------------------------------#
     ## CREATE STAGING LAYERS ##
-    #---------------------------------------------------------------------------------------#
-    # start timer for the get data requests
-    startTimer = datetime.now()
-    #---------------------------------------------------------------------------------------#
+    # #---------------------------------------------------------------------------------------#
+    # # start timer for the get data requests
+    # startTimer = datetime.now()
+    # #---------------------------------------------------------------------------------------#
 
-    # Create BMP feature class
-    # name of feature class
-    name = "Parcel_BMP"
+    # # Create BMP feature class
+    # # name of feature class
+    # name = "Parcel_BMP"
 
-    # specify output feature class
-    outFC = os.path.join(workspace, name)
+    # # specify output feature class
+    # outFC = os.path.join(workspace, name)
 
-    # create spatial data frame by merging parcels and sql table on APN
-    df = pd.merge(sdfParcels, dfBMP, on='APN', how='inner')
+    # # create spatial data frame by merging parcels and sql table on APN
+    # df = pd.merge(sdfParcels, dfBMP, on='APN', how='inner')
 
-    # specify fields to keep
-    fields = list(df.columns)[:3]+list(df.columns)[76:]+[list(df.columns)[74]]
+    # # specify fields to keep
+    # fields = list(df.columns)[:3]+list(df.columns)[76:]+[list(df.columns)[74]]
 
-    # specify fields to keep
-    dfOut = df[fields].copy()
+    # # specify fields to keep
+    # dfOut = df[fields].copy()
 
-    # rename some of the fields
-    dfOut.rename(columns={"PPNO_x": "PPNO"}, inplace=True)
+    # # rename some of the fields
+    # dfOut.rename(columns={"PPNO_x": "PPNO"}, inplace=True)
 
-    # spaital dataframe to feature class
-    dfOut.spatial.to_featureclass(outFC, sanitize_columns=False)
+    # # spaital dataframe to feature class
+    # dfOut.spatial.to_featureclass(outFC, sanitize_columns=False)
 
-    # confirm feature class was created
-    print("\nUpdated staging layer: " + outFC)
+    # # confirm feature class was created
+    # print("\nUpdated staging layer: " + outFC)
 
-    #---------------------------------------------------------------------------------------#
+    # #---------------------------------------------------------------------------------------#
 
-    ## Create feature class of Land Capability Verifications
-    # name of feature class
-    name = "Parcel_LCV"
+    # ## Create feature class of Land Capability Verifications
+    # # name of feature class
+    # name = "Parcel_LCV"
 
-    # specify output feature class
-    outFC = os.path.join(workspace, name)
+    # # specify output feature class
+    # outFC = os.path.join(workspace, name)
 
-    # create spatial data frame by merging parcels and sql table on APN
-    df = pd.merge(sdfParcels, dfLCV, left_on='APN', right_on='GIS_ID', how='inner')
+    # # create spatial data frame by merging parcels and sql table on APN
+    # df = pd.merge(sdfParcels, dfLCV, left_on='APN', right_on='GIS_ID', how='inner')
 
-    # rename some of the fields
-    df.rename(columns={"LABEL_FIELD": "Status"}, inplace=True)
+    # # rename some of the fields
+    # df.rename(columns={"LABEL_FIELD": "Status"}, inplace=True)
 
-    # specify fields to keep
-    dfOut = df[["OBJECTID","APN", "Status", "SHAPE"]].copy()
+    # # specify fields to keep
+    # dfOut = df[["OBJECTID","APN", "Status", "SHAPE"]].copy()
 
-    # spaital dataframe to feature class
-    dfOut.spatial.to_featureclass(outFC)
+    # # spaital dataframe to feature class
+    # dfOut.spatial.to_featureclass(outFC)
 
-    # confirm feature class was created
-    print("\nUpdated staging layer: " + outFC)
+    # # confirm feature class was created
+    # print("\nUpdated staging layer: " + outFC)
 
-    # -----------------------------------------------------------------------------------#
+    # # -----------------------------------------------------------------------------------#
 
-    ## Create feature class of LCV Challenges
-    # name of feature class
-    name = "Parcel_LCV_Challenge"
+    # ## Create feature class of LCV Challenges
+    # # name of feature class
+    # name = "Parcel_LCV_Challenge"
 
-    # specify output feature class
-    outFC = os.path.join(workspace, name)
+    # # specify output feature class
+    # outFC = os.path.join(workspace, name)
 
-    # create spatial data frame by merging parcels and sql table on APN
-    df = pd.merge(sdfParcels, dfLCC, left_on='APN', right_on='GIS_ID', how='inner')
+    # # create spatial data frame by merging parcels and sql table on APN
+    # df = pd.merge(sdfParcels, dfLCC, left_on='APN', right_on='GIS_ID', how='inner')
 
-    # rename some of the fields
-    df.rename(columns={"REC_DATE": "Date", "LABEL_FIELD": "Status"}, inplace=True)
+    # # rename some of the fields
+    # df.rename(columns={"REC_DATE": "Date", "LABEL_FIELD": "Status"}, inplace=True)
 
-    # specify fields to keep
-    dfOut = df[["APN", "Date", "Status", "SHAPE"]].copy()
+    # # specify fields to keep
+    # dfOut = df[["APN", "Date", "Status", "SHAPE"]].copy()
 
-    # spaital dataframe to feature class
-    dfOut.spatial.to_featureclass(outFC)
+    # # spaital dataframe to feature class
+    # dfOut.spatial.to_featureclass(outFC)
 
-    # confirm feature class was created
-    print("\nUpdated staging layer: " + outFC)
+    # # confirm feature class was created
+    # print("\nUpdated staging layer: " + outFC)
 
-    # -------------------------------------------------------------------------------------#
+    # # -------------------------------------------------------------------------------------#
 
-    ## Create feature class of SOILS/Hydro Project
-    # name of feature class
-    name = "Parcel_SoilsHydro"
+    # ## Create feature class of SOILS/Hydro Project
+    # # name of feature class
+    # name = "Parcel_SoilsHydro"
 
-    # specify output feature class
-    outFC = os.path.join(workspace, name)
+    # # specify output feature class
+    # outFC = os.path.join(workspace, name)
 
-    # create spatial data frame by merging parcels and sql table on APN
-    df = pd.merge(sdfParcels, dfSoil, left_on='APN', right_on='GIS_ID', how='inner')
+    # # create spatial data frame by merging parcels and sql table on APN
+    # df = pd.merge(sdfParcels, dfSoil, left_on='APN', right_on='GIS_ID', how='inner')
 
-    # rename some of the fields
-    df.rename(columns={"REC_DATE": "Date", "LABEL_FIELD": "Status"}, inplace=True)
+    # # rename some of the fields
+    # df.rename(columns={"REC_DATE": "Date", "LABEL_FIELD": "Status"}, inplace=True)
 
-    # specify fields to keep
-    dfOut = df[["APN", "Date", "Status", "SHAPE"]].copy()
+    # # specify fields to keep
+    # dfOut = df[["APN", "Date", "Status", "SHAPE"]].copy()
 
-    # spaital dataframe to feature class
-    dfOut.spatial.to_featureclass(outFC)
+    # # spaital dataframe to feature class
+    # dfOut.spatial.to_featureclass(outFC)
 
-    # confirm feature class was created
-    print("\nUpdated staging layer: " + outFC)
+    # # confirm feature class was created
+    # print("\nUpdated staging layer: " + outFC)
 
-    ##--------------------------------------------------------------------------------------#
+    # ##--------------------------------------------------------------------------------------#
 
-    ## Create feature class of historic designations
-    # name of feature class
-    name = "Parcel_Historic"
+    # ## Create feature class of historic designations
+    # # name of feature class
+    # name = "Parcel_Historic"
 
-    # specify output feature class
-    outFC = os.path.join(workspace, name)
+    # # specify output feature class
+    # outFC = os.path.join(workspace, name)
 
-    # create spatial data frame by merging parcels and sql table on APN
-    df = pd.merge(sdfParcels, dfHist, left_on='APN', right_on='GIS_ID', how='inner')
+    # # create spatial data frame by merging parcels and sql table on APN
+    # df = pd.merge(sdfParcels, dfHist, left_on='APN', right_on='GIS_ID', how='inner')
 
-    # rename some of the fields
-    df.rename(columns={"REC_DATE": "Date", "LABEL_FIELD": "Status"}, inplace=True)
+    # # rename some of the fields
+    # df.rename(columns={"REC_DATE": "Date", "LABEL_FIELD": "Status"}, inplace=True)
 
-    # specify fields to keep
-    dfOut = df[["APN", "Date", "Status", "SHAPE"]].copy()
+    # # specify fields to keep
+    # dfOut = df[["APN", "Date", "Status", "SHAPE"]].copy()
 
-    # spaital dataframe to feature class
-    dfOut.spatial.to_featureclass(outFC)
+    # # spaital dataframe to feature class
+    # dfOut.spatial.to_featureclass(outFC)
 
-    # confirm feature class was created
-    print("\nUpdated staging layer: " + outFC)
+    # # confirm feature class was created
+    # print("\nUpdated staging layer: " + outFC)
 
-    #---------------------------------------------------------------------------------------#
+    # #---------------------------------------------------------------------------------------#
 
-    ## Create feature class of historic designations
-    # name of feature class
-    name = "Parcel_GradingExceptions"
+    # ## Create feature class of historic designations
+    # # name of feature class
+    # name = "Parcel_GradingExceptions"
 
-    # specify output feature class
-    outFC = os.path.join(workspace, name)
+    # # specify output feature class
+    # outFC = os.path.join(workspace, name)
 
-    # create spatial data frame by merging parcels and sql table on APN
-    df = pd.merge(sdfParcels, dfGrade, left_on='APN', right_on='PARCEL_NUMBER', how='left')
+    # # create spatial data frame by merging parcels and sql table on APN
+    # df = pd.merge(sdfParcels, dfGrade, left_on='APN', right_on='PARCEL_NUMBER', how='left')
     
-    #drop null parcels that dont have joined attributes
-    df = df.dropna(subset=["PARCEL_NUMBER"])
+    # #drop null parcels that dont have joined attributes
+    # df = df.dropna(subset=["PARCEL_NUMBER"])
 
-    # specify fields to keep
-    dfOut = df[["APN", "PROPERTY_ADDRESS", "ApprovedEndingDate", "ApprovedBeginningDate", 
-                "FileNumber", "Comment", "SHAPE"]].copy()
+    # # specify fields to keep
+    # dfOut = df[["APN", "PROPERTY_ADDRESS", "ApprovedEndingDate", "ApprovedBeginningDate", 
+    #             "FileNumber", "Comment", "SHAPE"]].copy()
 
-    # spaital dataframe to feature class
-    dfOut.spatial.to_featureclass(outFC)
+    # # spaital dataframe to feature class
+    # dfOut.spatial.to_featureclass(outFC)
 
-    # confirm feature class was created
-    print("\nUpdated staging layer: " + outFC)
+    # # confirm feature class was created
+    # print("\nUpdated staging layer: " + outFC)
 
-    #---------------------------------------------------------------------------------------#
+    # #---------------------------------------------------------------------------------------#
 
     ## Create feature class of LT Info parcels
     # name of feature class
@@ -450,7 +460,7 @@ try:
     df = pd.merge(sdfParcels, dfDeed, on='APN', how='left')
 
     # specify fields to keep
-    fields = list(df.columns)[0:2]+list(df.columns)[75:]+[list(df.columns)[74]]
+    fields = list(df.columns)[0:6]+list(df.columns)[14:31]+['SHAPE']
 
     # specify fields to keep
     dfOut = df[fields].copy()
@@ -485,137 +495,137 @@ try:
     arcpy.UnregisterAsVersioned_management(fdata,"NO_KEEP_EDIT","COMPRESS_DEFAULT")
     print ("\nFinished unregistering feature dataset as versioned.")
 
-    #---------------------------------------------------------------------------------------#
-    # Update Parcel_BMP
+    # #---------------------------------------------------------------------------------------#
+    # # Update Parcel_BMP
 
-    # input staging feature class
-    inputFC = "Parcel_BMP"
+    # # input staging feature class
+    # inputFC = "Parcel_BMP"
 
-    # path to output FC
-    updateFC = sdeCollect + "\\sde_collection.SDE.Parcel\\sde_collection.SDE.Parcel_BMP"
+    # # path to output FC
+    # updateFC = sdeCollect + "\\sde_collection.SDE.Parcel\\sde_collection.SDE.Parcel_BMP"
 
-    # Get field objects from inputFC
-    dsc = arcpy.Describe(inputFC)
-    fields = dsc.fields
+    # # Get field objects from inputFC
+    # dsc = arcpy.Describe(inputFC)
+    # fields = dsc.fields
 
-    # List all field names except the OID field and geometry fields
-    # Replace 'Shape' with 'SHAPE@'
-    out_fields = [dsc.OIDFieldName, dsc.lengthFieldName, dsc.areaFieldName]
-    fieldnames = [field.name if field.name != 'Shape' else 'SHAPE@' for field in fields if field.name not in out_fields]
+    # # List all field names except the OID field and geometry fields
+    # # Replace 'Shape' with 'SHAPE@'
+    # out_fields = [dsc.OIDFieldName, dsc.lengthFieldName, dsc.areaFieldName]
+    # fieldnames = [field.name if field.name != 'Shape' else 'SHAPE@' for field in fields if field.name not in out_fields]
 
-    # update function (input, output, fields)
-    updateSDE(inputFC, updateFC, fieldnames)
+    # # update function (input, output, fields)
+    # updateSDE(inputFC, updateFC, fieldnames)
 
-    #---------------------------------------------------------------------------------------#
+    # #---------------------------------------------------------------------------------------#
 
-    # Update Parcel_LCV
+    # # Update Parcel_LCV
 
-    # input staging feature class
-    inputFC = "Parcel_LCV"
+    # # input staging feature class
+    # inputFC = "Parcel_LCV"
 
-    # path to output FC
-    updateFC = sdeCollect + "\\sde_collection.SDE.Parcel\\sde_collection.SDE.Parcel_Accela_LandCapabilityVerification"
+    # # path to output FC
+    # updateFC = sdeCollect + "\\sde_collection.SDE.Parcel\\sde_collection.SDE.Parcel_Accela_LandCapabilityVerification"
 
-    # Get field objects from inputFC
-    dsc = arcpy.Describe(inputFC)
-    fields = dsc.fields
+    # # Get field objects from inputFC
+    # dsc = arcpy.Describe(inputFC)
+    # fields = dsc.fields
 
-    # List all field names except the OID field and geometry fields
-    # Replace 'Shape' with 'SHAPE@'
-    out_fields = [dsc.OIDFieldName, dsc.lengthFieldName, dsc.areaFieldName]
-    fieldnames = [field.name if field.name != 'Shape' else 'SHAPE@' for field in fields if field.name not in out_fields]
+    # # List all field names except the OID field and geometry fields
+    # # Replace 'Shape' with 'SHAPE@'
+    # out_fields = [dsc.OIDFieldName, dsc.lengthFieldName, dsc.areaFieldName]
+    # fieldnames = [field.name if field.name != 'Shape' else 'SHAPE@' for field in fields if field.name not in out_fields]
 
-    # update function (input, output, fields)
-    updateSDE(inputFC, updateFC, fieldnames)
+    # # update function (input, output, fields)
+    # updateSDE(inputFC, updateFC, fieldnames)
 
-    #---------------------------------------------------------------------------------------#
+    # #---------------------------------------------------------------------------------------#
 
-    # Update Parcel_LCV_Challenge
+    # # Update Parcel_LCV_Challenge
 
-    # input staging feature class
-    inputFC = "Parcel_LCV_Challenge"
+    # # input staging feature class
+    # inputFC = "Parcel_LCV_Challenge"
 
-    # path to output FC
-    updateFC = sdeCollect + "\\sde_collection.SDE.Parcel\\sde_collection.SDE.Parcel_Accela_LCV_Challenge"
+    # # path to output FC
+    # updateFC = sdeCollect + "\\sde_collection.SDE.Parcel\\sde_collection.SDE.Parcel_Accela_LCV_Challenge"
 
-    # Get field objects from inputFC
-    dsc = arcpy.Describe(inputFC)
-    fields = dsc.fields
+    # # Get field objects from inputFC
+    # dsc = arcpy.Describe(inputFC)
+    # fields = dsc.fields
 
-    # List all field names except the OID field and geometry fields
-    # Replace 'Shape' with 'SHAPE@'
-    out_fields = [dsc.OIDFieldName, dsc.lengthFieldName, dsc.areaFieldName]
-    fieldnames = [field.name if field.name != 'Shape' else 'SHAPE@' for field in fields if field.name not in out_fields]
+    # # List all field names except the OID field and geometry fields
+    # # Replace 'Shape' with 'SHAPE@'
+    # out_fields = [dsc.OIDFieldName, dsc.lengthFieldName, dsc.areaFieldName]
+    # fieldnames = [field.name if field.name != 'Shape' else 'SHAPE@' for field in fields if field.name not in out_fields]
 
-    # update function (input, output, fields)
-    updateSDE(inputFC, updateFC, fieldnames)
+    # # update function (input, output, fields)
+    # updateSDE(inputFC, updateFC, fieldnames)
 
-    #---------------------------------------------------------------------------------------#
+    # #---------------------------------------------------------------------------------------#
 
-    # Update Parcel_SoilsHydro
+    # # Update Parcel_SoilsHydro
 
-    # input staging feature class
-    inputFC = "Parcel_SoilsHydro"
+    # # input staging feature class
+    # inputFC = "Parcel_SoilsHydro"
 
-    # path to output FC
-    updateFC = sdeCollect + "\\sde_collection.SDE.Parcel\\sde_collection.SDE.Parcel_Accela_SoilsHydro"
+    # # path to output FC
+    # updateFC = sdeCollect + "\\sde_collection.SDE.Parcel\\sde_collection.SDE.Parcel_Accela_SoilsHydro"
 
-    # Get field objects from inputFC
-    dsc = arcpy.Describe(inputFC)
-    fields = dsc.fields
+    # # Get field objects from inputFC
+    # dsc = arcpy.Describe(inputFC)
+    # fields = dsc.fields
 
-    # List all field names except the OID field and geometry fields
-    # Replace 'Shape' with 'SHAPE@'
-    out_fields = [dsc.OIDFieldName, dsc.lengthFieldName, dsc.areaFieldName]
-    fieldnames = [field.name if field.name != 'Shape' else 'SHAPE@' for field in fields if field.name not in out_fields]
+    # # List all field names except the OID field and geometry fields
+    # # Replace 'Shape' with 'SHAPE@'
+    # out_fields = [dsc.OIDFieldName, dsc.lengthFieldName, dsc.areaFieldName]
+    # fieldnames = [field.name if field.name != 'Shape' else 'SHAPE@' for field in fields if field.name not in out_fields]
 
-    # update function (input, output, fields)
-    updateSDE(inputFC, updateFC, fieldnames)
+    # # update function (input, output, fields)
+    # updateSDE(inputFC, updateFC, fieldnames)
 
-    #---------------------------------------------------------------------------------------#
+    # #---------------------------------------------------------------------------------------#
 
-    # Update Parcel_Historic
+    # # Update Parcel_Historic
 
-    # input staging feature class
-    inputFC = "Parcel_Historic"
+    # # input staging feature class
+    # inputFC = "Parcel_Historic"
 
-    # path to output FC
-    updateFC = sdeCollect + "\\sde_collection.SDE.Parcel\\sde_collection.SDE.Parcel_Accela_Historic"
+    # # path to output FC
+    # updateFC = sdeCollect + "\\sde_collection.SDE.Parcel\\sde_collection.SDE.Parcel_Accela_Historic"
 
-    # Get field objects from inputFC
-    dsc = arcpy.Describe(inputFC)
-    fields = dsc.fields
+    # # Get field objects from inputFC
+    # dsc = arcpy.Describe(inputFC)
+    # fields = dsc.fields
 
-    # List all field names except the OID field and geometry fields
-    # Replace 'Shape' with 'SHAPE@'
-    out_fields = [dsc.OIDFieldName, dsc.lengthFieldName, dsc.areaFieldName]
-    fieldnames = [field.name if field.name != 'Shape' else 'SHAPE@' for field in fields if field.name not in out_fields]
+    # # List all field names except the OID field and geometry fields
+    # # Replace 'Shape' with 'SHAPE@'
+    # out_fields = [dsc.OIDFieldName, dsc.lengthFieldName, dsc.areaFieldName]
+    # fieldnames = [field.name if field.name != 'Shape' else 'SHAPE@' for field in fields if field.name not in out_fields]
 
-    # update function (input, output, fields)
-    updateSDE(inputFC, updateFC, fieldnames)
+    # # update function (input, output, fields)
+    # updateSDE(inputFC, updateFC, fieldnames)
 
-    #---------------------------------------------------------------------------------------#
-    # Update Parcel_GradingExceptions
+    # #---------------------------------------------------------------------------------------#
+    # # Update Parcel_GradingExceptions
 
-    # input staging feature class
-    inputFC = "Parcel_GradingExceptions"
+    # # input staging feature class
+    # inputFC = "Parcel_GradingExceptions"
 
-    # path to output FC
-    updateFC = sdeCollect + "\\sde_collection.SDE.Parcel\\sde_collection.SDE.Parcel_Accela_GradingExceptions"
+    # # path to output FC
+    # updateFC = sdeCollect + "\\sde_collection.SDE.Parcel\\sde_collection.SDE.Parcel_Accela_GradingExceptions"
 
-    # Get field objects from inputFC
-    dsc = arcpy.Describe(inputFC)
-    fields = dsc.fields
+    # # Get field objects from inputFC
+    # dsc = arcpy.Describe(inputFC)
+    # fields = dsc.fields
 
-    # List all field names except the OID field and geometry fields
-    # Replace 'Shape' with 'SHAPE@'
-    out_fields = [dsc.OIDFieldName, dsc.lengthFieldName, dsc.areaFieldName]
-    fieldnames = [field.name if field.name != 'Shape' else 'SHAPE@' for field in fields if field.name not in out_fields]
+    # # List all field names except the OID field and geometry fields
+    # # Replace 'Shape' with 'SHAPE@'
+    # out_fields = [dsc.OIDFieldName, dsc.lengthFieldName, dsc.areaFieldName]
+    # fieldnames = [field.name if field.name != 'Shape' else 'SHAPE@' for field in fields if field.name not in out_fields]
 
-    # update function (input, output, fields)
-    updateSDE(inputFC, updateFC, fieldnames)
+    # # update function (input, output, fields)
+    # updateSDE(inputFC, updateFC, fieldnames)
 
-    #---------------------------------------------------------------------------------------#
+    # #---------------------------------------------------------------------------------------#
 
     # Update Parcel_LTInfo
 
@@ -770,10 +780,10 @@ try:
     log.write("\nTime it took to run this script: {}".format(FINALendTimer))
     log.close()
     
-    header = "SUCCESS - Parcel feature classes were updated."
-    # send email with header based on try/except result
-    send_mail(header)
-    print('Sending email...')
+    # header = "SUCCESS - Parcel feature classes were updated."
+    # # send email with header based on try/except result
+    # send_mail(header)
+    # print('Sending email...')
 
 # catch any arcpy errors
 except arcpy.ExecuteError:
@@ -781,10 +791,10 @@ except arcpy.ExecuteError:
     log.write(arcpy.GetMessages())
     log.close()
     
-    header = "ERROR - Arcpy Exception - Check Log"
-    # send email with header based on try/except result
-    send_mail(header)
-    print('Sending email...')
+    # header = "ERROR - Arcpy Exception - Check Log"
+    # # send email with header based on try/except result
+    # send_mail(header)
+    # print('Sending email...')
 
 # catch system errors
 except Exception:
@@ -793,7 +803,7 @@ except Exception:
     log.write(e)
     log.close()
     
-    header = "ERROR - System Error - Check Log"
-    # send email with header based on try/except result
-    send_mail(header)
-    print('Sending email...')
+    # header = "ERROR - System Error - Check Log"
+    # # send email with header based on try/except result
+    # send_mail(header)
+    # print('Sending email...')
