@@ -11,7 +11,7 @@ Parcel geometry and attributes are pulled via web services from the five county 
 The extracted county data is transformed into TRPA's standard schema. A series of string manipulations and spatial joins are used to do this tranformation. The TRPA standard schema can be viewed at this REST endpoint.
 
 ## Load Process
-The load process moves the staged parcel layer (Parcel_Staging_Attributed) into our Enterprise Geodatabase using a branch versioned workflow.
+The load process moves the new geometries and attributes from the staged parcel layer (Parcel_Staging_Attributed) into our Enterprise Geodatabase using a branch versioned workflow.
 
 ## Current Enchancements
 * Created a way to load a WKT dictionary as form data to LTinfo
