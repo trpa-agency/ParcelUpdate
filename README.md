@@ -11,11 +11,12 @@ Parcel geometry and attributes are pulled via web services from the five county 
 The extracted county data is transformed into TRPA's standard schema. A series of string manipulations and spatial joins are used to do this tranformation. The TRPA standard schema can be viewed at this REST endpoint.
 
 ## Load Process
-The load process moves the stage parcel layer (Parcel_Staging_Attributed) into our Enterprise Geodatabase using a branch versioned workflow.
+The load process moves the staged parcel layer (Parcel_Staging_Attributed) into our Enterprise Geodatabase using a branch versioned workflow.
 
 ## Current Enchancements
 * Created a way to load a WKT dictionary as form data to LTinfo
 * Updated the scripts metadata and structure
+  
 ## Future Enhancements
 * improve script metadata, error handling, and logging
 * Create an automated way via email to notify staff of new and obsolete parcels
@@ -25,6 +26,6 @@ The load process moves the stage parcel layer (Parcel_Staging_Attributed) into o
 * Save copy of September update to yearly folder structure
 * Script Parcel History based on september data
 * Script Parcel Point update
-* Script Parcel History Polygon data append using september data
+* Script Parcel History Polygon data append using September data
 * Notify TRCD and CTC of parcel update and stand up shared update layer of expanded parcel (Olympic Valley AOI) data or them to pull
 
