@@ -28,4 +28,7 @@ The load process moves the staged parcel layer (Parcel_Staging_Attributed) into 
 * Script Parcel Point update
 * Script Parcel History Polygon data append using September data
 * Notify TRCD and CTC of parcel update and stand up shared update layer of expanded parcel (Olympic Valley AOI) data or them to pull
+## Other
+### Deed Restriction update
 
+### Parcel Permit Transformation and Load
