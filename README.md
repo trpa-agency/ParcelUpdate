@@ -21,6 +21,10 @@ The load process moves the stage parcel layer (Parcel_Staging_Attributed) into o
 * Create an automated way via email to notify staff of new and obsolete parcels
 * Add QA/QC script
 * Update Address table for BMP load
-* Integrate varified address field
-* Save copy of Sepetember Update to yearly folder structure
+* Integrate verified address field
+* Save copy of September update to yearly folder structure
+* Script Parcel History based on september data
+* Script Parcel Point update
+* Script Parcel History Polygon data append using september data
+* Notify TRCD and CTC of parcel update and stand up shared update layer of expanded parcel (Olympic Valley AOI) data or them to pull
 
