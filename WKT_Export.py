@@ -1,0 +1,49 @@
+import arcpy
+import requests
+import json
+
+def get_parcel_wkt_list(featureLayer):
+    
+    # Define the list to store dictionaries
+    feature_list = []
+
+    # Use a SearchCursor to iterate through the features
+    with arcpy.da.SearchCursor(featureLayer, ['SHAPE@WKT', 'APN']) as cursor:
+        for row in cursor:
+            feature_dict = {
+                'APN': row[1],
+                'WKT': row[0]
+            }
+            feature_list.append(feature_dict)
+    return feature_list
+
+def post_parcel_geom_update(featureLayer, url, number_of_records):
+    # Use a SearchCursor to iterate through the features
+    with arcpy.da.SearchCursor(featureLayer, ['SHAPE@WKT', 'APN']) as cursor:
+
+        for i, row in enumerate(cursor):
+            if i >= number_of_records:
+                break
+            feature_dict = {
+                'APN': row[1],
+                'WKT': row[0]
+            }
+            print(feature_dict)
+            requests.post(url, feature_dict)
+
+feature_list = get_parcel_wkt_list(feature_layer_name)
+
+test_feature_list = feature_list[0:3]
+
+json_url = "https://qa.laketahoeinfo.org/api/UpdateParcelGeometries/1A77D078-B83E-44E0-8CA5-8D7429E1A6B4"
+data={"parcelGeometriesToUpdate": test_feature_list}
+
+headers = {
+    "Content-Type": "application/json"
+}
+data_json = json.dumps(data)
+# note: not sure this post is the correct python code
+response = requests.post(json_url, data=json.dumps(data), headers=headers)
+
+post_url = 'https://qa.laketahoeinfo.org/api/UpdateParcelGeometry/1A77D078-B83E-44E0-8CA5-8D7429E1A6B4'
+post_parcel_geom_update(feature_layer_name, post_url, 6)

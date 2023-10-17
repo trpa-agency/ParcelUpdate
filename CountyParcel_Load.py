@@ -291,7 +291,29 @@ def insert_new_parcels(featureLayer, new_APNs, new_parcels, fields):
                 new_count +=1
                 print(f"{new_count} rows inserted into {featureLayer}.")
                 
+def generate_updated_shape_wkt(featureLayer, wkt_file_name):
+    # Open the output text file for writing
+    with open(wkt_file_name, "w") as wkt_file:
+
+        # Write headers for your fields    
+        field_names = ["APN"]  
+        # Replace with your field names    
+        wkt_file.write("\t".join(field_names) + "\tWKT\n")
+
+            # Create a cursor to retrieve fields and geometry    
+        fields = ["APN", "SHAPE@WKT"]  # Replace with your actual field names    
+        cursor = arcpy.da.SearchCursor(featureLayer, fields)
+        for row in cursor:
+            field1_value,  wkt_geometry = row        
+            row_data = [field1_value, wkt_geometry]
+            wkt_file.write("\t".join(map(str, row_data)) + "\n")
+
+        # Clean up by deleting the cursor
+        del cursor
+
 # updates @SHAPE that aren't identical to existing shapes
+
+
 @timer
 def update_parcel_geometry(featureLayer, new_parcels):
     newShapes = arcpy.management.SelectLayerByLocation(
@@ -314,6 +336,9 @@ def update_parcel_geometry(featureLayer, new_parcels):
     count = int(result.getOutput(0))
     # number of shapes shifted
     print(f"{count} shapes shifted.")
+    wkt_file_name = "Updated_Shapes_" + strftime("%Y-%m-%d")+".wkt"
+    #Write to a wky file
+    generate_updated_shape_wkt(newShapes, wkt_file_name)
     
 @timer
 def generate_spatial_dataframe(feature_class, data_type_mapping, fields_to_exclude): 
