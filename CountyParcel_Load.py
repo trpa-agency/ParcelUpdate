@@ -365,10 +365,7 @@ access = "PUBLIC"
 #Create the new branch version
 arcpy.CreateVersion_management(workspace_parent, parent_version, version_name, access)
 
-
 ## CHANGE VERSION
-
-
 
 # parcel master branch versioned feature service
 parcelMasterVersion = r"https://maps.trpa.org/server/rest/services/Parcel_Edits/FeatureServer/0"
@@ -402,7 +399,6 @@ parcel_base_old_apn   = old_new_parcels_list(featureLayer_Base, parcelNew, 'No',
 # Make the dataframe for eventual insert to new_old SQL table - wait to actually insert until process is complete
 
 df_parcel_changes = make_old_new_dataframe(featureLayer, parcelNew, 'Yes', prefix_remove)
-
 
 # UPDATE PARCEL MASTER
 
@@ -439,8 +435,8 @@ fields_to_ignore = ['PARCEL_SQFT', 'PPNO', 'ESTIMATED_COVERAGE_ALLOWED', 'IMPERV
 
 # get the differences as dictionaries
 differences_master = differenceDictionary(dfparcelMaster, dfparcelNew, 'APN', fields_to_ignore)
-
-differences_master.to_csv("Differences_List.csv")
+dfDiff = pd.DataFrame(differences_master)
+dfDiff.to_csv("Differences_List.csv")
 
 # function to update attributes
 # This can take a minute - CHANGE TO WRITE TO CSV?
@@ -491,7 +487,7 @@ dfparcelNew = generate_spatial_dataframe(parcelNew, data_type_mapping, fields_to
 dfparcelBase = generate_spatial_dataframe(featureLayer_Base, data_type_mapping, fields_to_exclude)
 
 # filter to new parcels within TRPA boundary
-#dfparcelNew=dfparcelNew.loc[dfparcelNew['WITHIN_TRPA_BNDY']==1]
+dfparcelNew=dfparcelNew.loc[dfparcelNew['WITHIN_TRPA_BNDY']==1]
 #df_special_parcels = pd.read_excel("//Trpa-fs01/GIS/PARCELUPDATE/Workspace/special_parcels.xlsx")
 matching_apns_parcel_base = return_matching_apns(featureLayer_Base, parcelNew, df_special_parcels)
 
@@ -501,7 +497,7 @@ dfparcelBase = dfparcelBase[dfparcelBase['APN'].isin(matching_apns_parcel_base)]
 dfparcelNew    = dfparcelNew[dfparcelNew['APN'].isin(matching_apns_parcel_base)]
 
 
-fields_to_ignore = []
+fields_to_ignore = ['Shape', 'PARCEL_ACRES', 'PARCEL_SQFT', 'OBJECTID']
 
 # get the differences as dictionaries
 differences_base = differenceDictionary(dfparcelBase, dfparcelNew, 'APN', fields_to_ignore)
@@ -510,11 +506,6 @@ print(len(differences_base))
 df_dif=pd.DataFrame(differences_base)
 df_dif.to_csv('base_differences.csv')
 
-dfparcelBase = dfparcelBase[dfparcelBase['APN'].isin(matching_apns_parcel_base)]
-#This needs to be redefined
-dfparcelNew = dfparcelNew[dfparcelNew['APN'].isin(matching_apns_parcel_base)]
-fields_to_ignore = []
-differences_base = differenceDictionary(dfparcelBase, dfparcelNew, 'APN', fields_to_ignore)
 
 update_fc_from_dict(differences_base, 'APN', featureLayer_Base)
 

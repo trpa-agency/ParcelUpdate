@@ -1138,7 +1138,7 @@ canadaRegex = r'(.+?)\s([A-Z]{1,2})\s(CANADA)\s(.*)'
 brazilRegex = r'(.+?)\s(BRAZIL)\s(.*)'
 
 # Set up list for addresses with a country name in the mail_addr4 column.
-countriesList = ['japan','canada']
+countriesList = ['japan','canada', 'australia']
 
 # Transform County data to TRPA Schema
 with arcpy.da.UpdateCursor(eldoradoParcel, [
@@ -2375,7 +2375,10 @@ set_to_blank_values = ['0', '0 NULL']
 
 with arcpy.da.UpdateCursor('Parcel_Staging', ["STR_NAME_TRPA"]) as cursor:
     for row in cursor:
-        row[0]=row[0].upper()        
+        if not row[0] is None:
+            row[0]=row[0].upper()
+        else:
+            row[0] = ''      
         for replacement_value in replacement_values:
             row[0] = row[0].replace(replacement_value, '')
         row[0] = row[0].replace('  ', ' ')
