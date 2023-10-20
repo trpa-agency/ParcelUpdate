@@ -1,4 +1,24 @@
-import pandas as pd
+"""
+GradingExceptions_to_ParcelFeatures.py
+Created: October 13th, 2023
+Last Updated: October 19th, 2023
+Mason Bindl, Tahoe Regional Planning Agency
+Amy Fish, Tahoe Regional Planning Agency
+Andy McClary, Tahoe Regional Planning Agency
+
+This python script was developed to move data from 
+Accela reprots to TRPA's dynamic Enterprise Geodatabase.
+This ETL process updates parcel based feature classes for Grading Exceptions.
+
+This script uses Python 3.x and was designed to be used with 
+the default ArcGIS Pro python enivorment 
+""C:/Program Files/ArcGIS/Pro/bin/Python/envs/arcgispro-py3/python.exe"", 
+with no need for installing new libraries.
+
+This script runs nightly at 10pm on Arc10 from scheduled task "Grading Exception ETL"
+"""
+
+#-------------------------------------------------------------------------------------------------------------------#
 # from boxsdk import OAuth2, Client
 
 # # Set up your Box API credentials
@@ -15,15 +35,61 @@ import pandas as pd
 # # box_file = client.folder(folder_id).get_items(name=file_name)[0]
 # with open(file_name, 'wb') as f:
 #     box_file.download_to(f)
+# import packages
+import pandas as pd
+import arcpy
+import os
+import logging
+from datetime import datetime
+from arcgis.features import FeatureSet, GeoAccessor, GeoSeriesAccessor
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
+# set overwrite to true
+arcpy.env.overwriteOutput = True
+
+# in memory output file path
+memory = "memory" + "\\"
+
+# set workspace and sde connections 
+working_folder      = "C:\GIS"
+workspace           = "C:\GIS\Scratch.gdb"
+arcpy.env.workspace = "C:\GIS\Scratch.gdb"
+
+# network path to connection files
+filePath   = "C:\\GIS\\DB_CONNECT"
+sdeBase    = os.path.join(filePath, "Vector.sde")
+sdeCollect = os.path.join(filePath, "Collection.sde")
+
+# Feature dataset to unversion and register as version
+fdata = sdeCollect + "\\sde_collection.SDE.Parcel"
+
+
+# Configure the logging
+log_file_path = os.path.join(working_folder, "GradingException.log")  # Specify the path to your local directory
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    filename=log_file_path,  # Set the log file path
+                    filemode='w')
+
+# Create a logger
+logger = logging.getLogger(__name__)
+
+# start a timer for the entire script run
+FIRSTstartTimer = datetime.now()
+
+# Log different types of messages
+logger.info("Script Started: " + str(FIRSTstartTimer) + "\n")
+
+#---------------------------------------------------------------------------------------#
+# start timer for the get data requests
+startTimer = datetime.now()
 
 # local csv file location
-accelaFiles = ""
-dfGrade = dfGrade    = pd.read_csv(os.path.join(accelaFiles, "Grade.csv"))
-
-
-# make dataframes from exported accela views
 accelaFiles = "//trpa-fs01/GIS/Acella/Reports"
-
+# make dataframes from exported accela views
+dfGrade = pd.read_csv(os.path.join(accelaFiles, "Grading_Exception_Map.csv"))
 
 # create spatial dataframe from parcel master in sde
 parcels = sdeBase + "\\sde.SDE.Parcels\\sde.SDE.Parcel_Master"
@@ -31,8 +97,9 @@ sdfParcels = pd.DataFrame.spatial.from_featureclass(parcels)
        
 # report how long it took to get the data
 endTimer = datetime.now() - startTimer
-print("\nTime it took to get the data: {}".format(endTimer))   
-log.write("\nTime it took to get the data: {}".format(endTimer)) 
+
+logger.info("\nTime it took to get the data: {}".format(endTimer))   
+
 #---------------------------------------------------------------------------------------#
 ## Define Functions ##
 #---------------------------------------------------------------------------------------#
@@ -40,10 +107,9 @@ log.write("\nTime it took to get the data: {}".format(endTimer))
 ## SEND EMAIL WITH LOG FILE ##
 ##--------------------------------------------------------------------------------------------------------#
 # path to text file
-fileToSend = complete_txt_path
-
+fileToSend = log_file_path
 # email parameters
-subject = "Parcel ETL Log File"
+subject = "Grading Exception ETL Log File"
 sender_email = "infosys@trpa.org"
 # password = ''
 receiver_email = "gis@trpa.gov"
@@ -93,7 +159,7 @@ def updateSDE(inputfc,outfc, fieldnames):
 
 try:
     #---------------------------------------------------------------------------------------#
-    ## CREATE STAGING LAYERS ##
+    ## CREATE STAGING LAYER ##
     #---------------------------------------------------------------------------------------#
     # start timer for the get data requests
     startTimer = datetime.now()
@@ -109,13 +175,25 @@ try:
 
     # create spatial data frame by merging parcels and sql table on APN
     df = pd.merge(sdfParcels, dfGrade, left_on='APN', right_on='PARCEL_NUMBER', how='left')
-    
+
     #drop null parcels that dont have joined attributes
     df = df.dropna(subset=["PARCEL_NUMBER"])
 
-    # specify fields to keep
-    dfOut = df[["APN", "PROPERTY_ADDRESS", "ApprovedEndingDate", "ApprovedBeginningDate", 
-                "FileNumber", "Comment", "SHAPE"]].copy()
+    # # specify fields to keep
+    dfOut = df[["APN", 
+                "APO_ADDRESS", 
+                'B1_ALT_ID',
+                'Start_Date',
+                'End_Date',
+                'Description',
+                "SHAPE"]].copy()
+
+    dfOut = dfOut.rename(columns={'APN':'apn',
+                                'APO_ADDRESS':'property_address',
+                                'End_Date':'approved_ending_date',
+                                'Start_Date':'approved_beggining_date',
+                                'B1_ALT_ID':'file_number',
+                                'Description':'comment'})
 
     # spaital dataframe to feature class
     dfOut.spatial.to_featureclass(outFC)
@@ -174,45 +252,43 @@ try:
     ##--------------------------------------------------------------------------------------------------------#
 
     # disconnect all users
-    print("\nDisconnecting all users...")
+    logger.info("\nDisconnecting all users...")
     arcpy.DisconnectUser(sdeCollect, "ALL")
 
-    print("\nRegistering feature dataset as versioned...")
+    logger.info("\nRegistering feature dataset as versioned...")
     # register SDE feature class as versioned
     arcpy.RegisterAsVersioned_management(fdata, "NO_EDITS_TO_BASE")
-    print("\nFinished registering feature dataset as versioned.")
+    logger.info("\nFinished registering feature dataset as versioned.")
 
     # report how long it took to run the script
     FINALendTimer = datetime.now() - FIRSTstartTimer
     print ("\nTime it took to run this script: {}".format(FINALendTimer))
 
-    log.write("\nTime it took to run this script: {}".format(FINALendTimer))
-    log.close()
+    logger.info("\nTime it took to run this script: {}".format(FINALendTimer))
+    logger.close()
     
-    # header = "SUCCESS - Parcel feature classes were updated."
-    # # send email with header based on try/except result
-    # send_mail(header)
-    # print('Sending email...')
+    header = "SUCCESS - Parcel feature classes were updated."
+    # send email with header based on try/except result
+    send_mail(header)
+    print('Sending email...')
 
 # catch any arcpy errors
 except arcpy.ExecuteError:
     print(arcpy.GetMessages())
-    log.write(arcpy.GetMessages())
-    log.close()
-    
-    # header = "ERROR - Arcpy Exception - Check Log"
-    # # send email with header based on try/except result
-    # send_mail(header)
-    # print('Sending email...')
+    logger.error(arcpy.GetMessages())
+    logger.close()
+    header = "ERROR - Arcpy Exception - Check Log"
+    # send email with header based on try/except result
+    send_mail(header)
+    print('Sending email...')
 
 # catch system errors
 except Exception:
     e = sys.exc_info()[1]
     print(e.args[0])
-    log.write(e)
-    log.close()
-    
-    # header = "ERROR - System Error - Check Log"
-    # # send email with header based on try/except result
-    # send_mail(header)
-    # print('Sending email...')
+    logger.error(e)
+    logger.close()
+    header = "ERROR - System Error - Check Log"
+    # send email with header based on try/except result
+    send_mail(header)
+    print('Sending email...')
