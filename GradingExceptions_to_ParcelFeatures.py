@@ -141,9 +141,9 @@ def send_mail(body):
 def updateSDE(inputfc,outfc, fieldnames):
     # deletes all rows from the SDE feature class
     arcpy.TruncateTable_management(outfc)
-    print ("\nDeleted all records in: {}\n".format(outfc))
+    logger.info("\nDeleted all records in: {}\n".format(outfc))
     from time import strftime  
-    print ("Started data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
+    logger.info("Started data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
     # insert rows from Temporary feature class to SDE feature class
     with arcpy.da.InsertCursor(outfc, fieldnames) as oCursor:
         count = 0
@@ -151,11 +151,11 @@ def updateSDE(inputfc,outfc, fieldnames):
             for row in iCursor:
                 oCursor.insertRow(row)
                 count += 1
-                if count % 1000 == 0:
-                    print("Inserting record %d into %s SDE feature class" % (count, outfc))
-            print ("Finished data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
-            print("Done updating: %s"%(outfc))
-            log.write("\nDone updating: %s"%(outfc))
+                if count % 100 == 0:
+                    logger.info("Inserting record %d into %s SDE feature class" % (count, outfc))
+            logger.info("Finished data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
+            logger.info("Done updating: %s"%(outfc))
+            logger.info("\nDone updating: %s"%(outfc))
 
 try:
     #---------------------------------------------------------------------------------------#
@@ -191,7 +191,7 @@ try:
     dfOut = dfOut.rename(columns={'APN':'apn',
                                 'APO_ADDRESS':'property_address',
                                 'End_Date':'approved_ending_date',
-                                'Start_Date':'approved_beggining_date',
+                                'Start_Date':'approved_beginning_date',
                                 'B1_ALT_ID':'file_number',
                                 'Description':'comment'})
 
@@ -265,9 +265,8 @@ try:
     print ("\nTime it took to run this script: {}".format(FINALendTimer))
 
     logger.info("\nTime it took to run this script: {}".format(FINALendTimer))
-    logger.close()
-    
-    header = "SUCCESS - Parcel feature classes were updated."
+   
+    header = "SUCCESS - The Grading Exception feature class was updated."
     # send email with header based on try/except result
     send_mail(header)
     print('Sending email...')
@@ -276,7 +275,6 @@ try:
 except arcpy.ExecuteError:
     print(arcpy.GetMessages())
     logger.error(arcpy.GetMessages())
-    logger.close()
     header = "ERROR - Arcpy Exception - Check Log"
     # send email with header based on try/except result
     send_mail(header)
@@ -287,7 +285,6 @@ except Exception:
     e = sys.exc_info()[1]
     print(e.args[0])
     logger.error(e)
-    logger.close()
     header = "ERROR - System Error - Check Log"
     # send email with header based on try/except result
     send_mail(header)
