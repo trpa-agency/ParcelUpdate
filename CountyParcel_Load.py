@@ -19,37 +19,33 @@ arcpy.env.workspace = "//Trpa-fs01/GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb"
 arcpy.env.overwriteOutput = True
 arcpy.env.outputCoordinateSystem = arcpy.SpatialReference(26910)
 
+# Get the current script's directory
+#script_directory = os.path.dirname(os.path.abspath(__file__))
+
 # set workspace and sde connections 
 workspace = "//Trpa-fs01/GIS/PARCELUPDATE/Workspace/Staging"
 
 # network path to connection files
-filePath = "//Trpa-fs01/GIS/PARCELUPDATE/Workspace/"
+#filePath = "//Trpa-fs01/GIS/PARCELUPDATE/Workspace/"
 
-# portal signin
-## TRPA_ADMIN credentials 
-portal_user = "TRPA_PORTAL_ADMIN"
-portal_pwd = str(os.environ.get('Password'))
-portal_url = "https://maps.trpa.org/portal/"
-
-sdeBase    = os.path.join(filePath, "Vector.sde/")
-sdeTabular = os.path.join(filePath, "Tabular.sde")
-#Generate old new apn lists
-#Currently no sde.county_parcel_staging
-parcelMaster   = sdeBase + "\\sde.SDE.Parcels\\sde.SDE.Parcel_Master"
-parcelBase     = sdeBase + "\\sde.SDE.Parcels\\sde.SDE.Parcels_Base"
-parcelAPNOldNew = sdeTabular + "\\sde.SDE.Parcel_APN_NewOld"
-
-# New Parcels come from local layer parcel county staging
-parcelNew      = "Parcel_County_Staging"
 
 #This needs to be shifted over to SQL Table
 df_special_parcels= pd.read_excel("//Trpa-fs01/GIS/PARCELUPDATE/Workspace/special_parcels.xlsx")
 
-# parcelSpecial = sdeBase+"\\sde.SDE." 
-# parcelUpdated = "ParcelUpdated"
+""" #Create Local Database Connection
+# Enterprise geodatabase connection parameters
+server_name = "sql12"
+database_name = "sde"
+username = "sde"
+password = "staff"
+#change to include date dynamically
+version_name = "parcel_update_10182023"
 
-# sign in
-arcpy.SignInToPortal(portal_url, portal_user, portal_pwd)
+# Create a new connection to the enterprise geodatabase in the script directory
+enterprise_connection = arcpy.CreateDatabaseConnection_management(
+    script_directory, "EnterpriseDBConnection.sde", "SQL_SERVER", server_name, database_name,
+    "DATABASE_AUTH", username, password, "SAVE_USERNAME"
+)[0] """
 
 ### Functions ###
 # time a function function
@@ -98,9 +94,8 @@ def fieldJoinCalc(updateFC, updateFieldsList, sourceFC, sourceFieldsList):
     print ("Finished data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
 #     log.info("Finished data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
 
-# transfer attributes frome one feature class field to another while using multiple fields to create the keys
-@timer
-def fieldJoinCalc_multikey(updateFC, updateFieldsList_key, updateFieldsList_value, sourceFC, sourceFieldsList_key, sourceFieldsList_value):
+# transfer attributes frome one feature class field to another while using multiple fields to create the keys@timer
+def fieldJoinCalc_multikey(updateFC, updateFieldsList_key, updateFieldsList_value, sourceFC, sourceFieldsList_key, sourceFieldsList_value, edit_session):
     from time import strftime  
     print ("Started data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
 #     log.info("Started data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
@@ -116,14 +111,15 @@ def fieldJoinCalc_multikey(updateFC, updateFieldsList_key, updateFieldsList_valu
                 total_count +=1
                 if (total_count%1000)==0:
                     print (f"Updating row {total_count}")
+                edit_session.startOperation()
                 # transfer the value stored under the keyValue from the dictionary to the updated field.  
                 updateRow[2] = valueDict[keyValue]  
-                updateRows.updateRow(updateRow)    
+                
+                updateRows.updateRow(updateRow)
+                edit_session.stopOperation()    
     del valueDict  
     print ("Finished data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
 #     log.info("Finished data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
-
-# find attribute level differences in two identical data frames
 #Gonna have to make this a compound key as well - need to handle duplicate APNs?
 @timer
 def differenceDictionary(df1, df2, key_field, fields_to_ignore):
@@ -158,6 +154,8 @@ def differenceDictionary(df1, df2, key_field, fields_to_ignore):
     df2 = df2[common_columns]
     diff_df = df1.compare(df2)
     #
+    if diff_df.empty:
+        return {}
     new_values =diff_df.loc[:,pd.IndexSlice[:,'other']].droplevel(1,axis=1)
     #
     dict_update = new_values.to_dict('index')
@@ -182,7 +180,7 @@ def differenceDictionary(df1, df2, key_field, fields_to_ignore):
 
 # use the differences dictionary to update attributes in feature service or feature class
 @timer
-def update_fc_from_dict(update_dict,key_field, fc):
+def update_fc_from_dict(update_dict,key_field, fc,edit_session):
     #This gets our update cursor down to fields that need to be updated
     update_fields = set(field for values in update_dict.values() for field in values.keys())
     # create a SQL query to filter the feature class based on the key field values
@@ -203,7 +201,9 @@ def update_fc_from_dict(update_dict,key_field, fc):
                     for field, value in update_values.items():
                         index = cursor.fields.index(field)
                         row[index] = value
+                    edit_session.startOperation()
                     cursor.updateRow(row)
+                    edit_session.stopOperation()
                         #print("Updated APN/Field: "+str(row[0])+" / "+str(field))
                 except Exception as e:
                     apn_issues.append(key_field_value)
@@ -266,30 +266,36 @@ def return_matching_apns(feature_class_old,
 
 # deletes parcels
 @timer
-def delete_old_parcels(featureLayer, oldAPNs):
+def delete_old_parcels(featureLayer, oldAPNs, edit_session):
     delete_count = 0
     with arcpy.da.UpdateCursor(featureLayer, ["APN"]) as cursor:
         for row in cursor:
             apn = row[0]
             if apn in oldAPNs:
+                edit_session.startOperation()
                 cursor.deleteRow()
+                edit_session.stopOperation()
                 delete_count +=1
     print(f"{delete_count} rows deleted from {featureLayer}.")
 
 # inserts new parcels
 @timer
-def insert_new_parcels(featureLayer, new_APNs, new_parcels, fields):
+def insert_new_parcels(featureLayer, new_APNs, new_parcels, fields, edit_session):
     new_count = 0
     where_clause = f"{arcpy.AddFieldDelimiters(featureLayer, 'APN')} IN "+str(tuple(new_APNs))
     print(where_clause)
     with arcpy.da.SearchCursor(new_parcels, fields, where_clause) as search_cursor:
     # Open an insert cursor to the destination feature class
+        edit_session.startOperation()
         with arcpy.da.InsertCursor(featureLayer, fields) as insert_cursor:
             # insert the rows from the serach cursor
             for row in search_cursor:
+                
                 insert_cursor.insertRow(row)
+                
                 new_count +=1
                 print(f"{new_count} rows inserted into {featureLayer}.")
+        edit_session.stopOperation()
                 
 def generate_updated_shape_wkt(featureLayer, wkt_file_name):
     # Open the output text file for writing
@@ -313,9 +319,8 @@ def generate_updated_shape_wkt(featureLayer, wkt_file_name):
 
 # updates @SHAPE that aren't identical to existing shapes
 
-
 @timer
-def update_parcel_geometry(featureLayer, new_parcels):
+def update_parcel_geometry(featureLayer, new_parcels, edit_session):
     newShapes = arcpy.management.SelectLayerByLocation(
     in_layer=new_parcels,
     overlap_type="ARE_IDENTICAL_TO",
@@ -329,7 +334,7 @@ def update_parcel_geometry(featureLayer, new_parcels):
     updateFieldsList_value = ['SHAPE@']
     sourceFieldsList_key = ['APN', 'JURISDICTION']
     sourceFieldsList_value = ['SHAPE@']
-    fieldJoinCalc_multikey(featureLayer, updateFieldsList_key, updateFieldsList_value, newShapes, sourceFieldsList_key, sourceFieldsList_value)
+    fieldJoinCalc_multikey(featureLayer, updateFieldsList_key, updateFieldsList_value, newShapes, sourceFieldsList_key, sourceFieldsList_value, edit_session)
 
     # Get the count of selected features
     result = arcpy.management.GetCount(newShapes)
@@ -375,55 +380,43 @@ def get_text_fields(feature_class):
             field_list.append(field.name)
     return field_list
 
+#Create database connection
 
-
-## CREATE NEW VERSION - maybe do for each parcel update
-# parent version
-workspace_parent = r"https://maps.trpa.org/server/rest/services/Parcel_Edits/FeatureServer"
+inWorkspace = "//Trpa-fs01\GIS\PARCELUPDATE\Workspace\Vector.sde"
+arcpy.env.workspace = inWorkspace
+# Specify the name of the new version and the parent version
+new_version_name = "Parcel_Update_" + strftime("%Y-%m-%d")
 parent_version = "SDE.DEFAULT"
-# Define the name of the new branch version and the access level
+version_name_full = "SDE." + new_version_name
+parcelMaster = 'parcelMasterVersion'
+parcelBase = 'parcelBaseVersion'
+arcpy.MakeFeatureLayer_management(r'SDE.Parcels\SDE.Parcel_Master',parcelMaster)
+arcpy.MakeFeatureLayer_management(r'SDE.Parcels\SDE.Parcels_Base',parcelBase)
 
-version_name = "Parcel_Update_" + strftime("%Y-%m-%d")
-version_name_full = portal_user + "." + version_name
-access = "PUBLIC"
+parcelNew = 'parcelNew'
 
-#Create the new branch version
-arcpy.CreateVersion_management(workspace_parent, parent_version, version_name, access)
+arcpy.MakeFeatureLayer_management("//Trpa-fs01/GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb/Parcel_County_Staging", parcelNew)
 
-## CHANGE VERSION
+# Create a new version
+arcpy.CreateVersion_management(inWorkspace, parent_version, new_version_name, "PUBLIC")
 
-# parcel master branch versioned feature service
-parcelMasterVersion = r"https://maps.trpa.org/server/rest/services/Parcel_Edits/FeatureServer/0"
-# feature layer name
-featureLayer= 'parcelMasterVersion'
-# make feature layer
-arcpy.management.MakeFeatureLayer(parcelMasterVersion, featureLayer)
-# change to version to edit
-arcpy.management.ChangeVersion(featureLayer, "BRANCH", version_name_full)
-
-parcelBaseVersion = r"https://maps.trpa.org/server/rest/services/Parcel_Edits/FeatureServer/1"
-featureLayer_Base = 'parcelBaseVersion'
-arcpy.management.MakeFeatureLayer(parcelBaseVersion, featureLayer_Base)
-# change to version to edit
-arcpy.management.ChangeVersion(featureLayer_Base, "BRANCH", version_name_full)
-
-# prefixxes to remove...these we keep or ignore
+# prefixes to remove...these we keep or ignore
 prefix_remove = ('880','881','910','920')
 # parcel master old/new
-parcel_master_new_apn = old_new_parcels_list(featureLayer, parcelNew, 'Yes', 
+parcel_master_new_apn = old_new_parcels_list(parcelMaster, parcelNew, 'Yes', 
                                              prefix_remove,'New APN')
-parcel_master_old_apn = old_new_parcels_list(featureLayer, parcelNew, 'No', 
+parcel_master_old_apn = old_new_parcels_list(parcelBase, parcelNew, 'No', 
                                              prefix_remove,'Old APN')
 # parcel base old/new
-parcel_base_new_apn   = old_new_parcels_list(featureLayer_Base, parcelNew, 'Yes', 
+parcel_base_new_apn   = old_new_parcels_list(parcelBase, parcelNew, 'Yes', 
                                            prefix_remove,'New APN')
-parcel_base_old_apn   = old_new_parcels_list(featureLayer_Base, parcelNew, 'No', 
+parcel_base_old_apn   = old_new_parcels_list(parcelBase, parcelNew, 'No', 
                                            prefix_remove,'Old APN')
 
 #Need to generate a list of new and old parcels and add it to TableNewOld_APN in sde_tabular
 # Make the dataframe for eventual insert to new_old SQL table - wait to actually insert until process is complete
 
-df_parcel_changes = make_old_new_dataframe(featureLayer, parcelNew, 'Yes', prefix_remove)
+df_parcel_changes = make_old_new_dataframe(parcelMaster, parcelNew, 'Yes', prefix_remove)
 
 # UPDATE PARCEL MASTER
 
@@ -441,12 +434,12 @@ data_type_mapping = {
 fields_to_exclude = ['SHAPE','OBJECTID', 'Shape']
 
 dfparcelNew = generate_spatial_dataframe(parcelNew, data_type_mapping, fields_to_exclude)
-dfparcelMaster = generate_spatial_dataframe(featureLayer, data_type_mapping, fields_to_exclude)
+dfparcelMaster = generate_spatial_dataframe(parcelMaster, data_type_mapping, fields_to_exclude)
 
 # filter to new parcels within TRPA boundary
 dfparcelNew=dfparcelNew.loc[dfparcelNew['WITHIN_TRPA_BNDY']==1]
 df_special_parcels = pd.read_excel("//Trpa-fs01/GIS/PARCELUPDATE/Workspace/special_parcels.xlsx")
-matching_apns_parcel_master = return_matching_apns(featureLayer, parcelNew, df_special_parcels)
+matching_apns_parcel_master = return_matching_apns(parcelMaster, parcelNew, df_special_parcels)
 
 # filter parcel master to matching APNs
 dfparcelMaster = dfparcelMaster[dfparcelMaster['APN'].isin(matching_apns_parcel_master)]
@@ -465,36 +458,69 @@ dfDiff.to_csv("Differences_List.csv")
 
 # function to update attributes
 # This can take a minute - CHANGE TO WRITE TO CSV?
-apn_issues = update_fc_from_dict(differences_master, 'APN', featureLayer)
+#Create Local Database Connection
+# Enterprise geodatabase connection parameters
+server_name = "sql12"
+database_name = "sde"
+username = "sde"
+password = "staff"
+#change to include date dynamically
+#version_name = "parcel_update_10182023"
+
+# Create a new connection to the enterprise geodatabase in the script directory
+#enterprise_connection = os.path.join(script_directory, "EnterpriseDBConnection.sde")
+
+# If you want to create a connection file, you can use the following code:
+arcpy.CreateDatabaseConnection_management(
+    out_folder_path='db_connections/',
+    out_name="ConnectionFile.sde",
+    database_platform="SQL_SERVER",  # Replace with your DBMS type (e.g., ORACLE, SQL_SERVER, POSTGRESQL)
+    instance=server_name,
+    database=database_name,
+    account_authentication="DATABASE_AUTH",  # Use "OPERATING_SYSTEM" for OS authentication
+    username=username,
+    password=password,
+    version_type='TRANSACTIONAL',
+    version=version_name_full
+)
+# Create a new version
+#arcpy.CreateVersion_management(inWorkspace, parent_version, new_version_name, "PUBLIC")
+arcpy.ChangeVersion_management(parcelMaster,'TRANSACTIONAL', version_name_full, '')
+# Start an edit session
+edit = arcpy.da.Editor('db_connections/ConnectionFile.sde')
+edit.startEditing(False, True)
+#Update Parcel_Master
+#try:
+    # Start an edit operation
+#edit.startOperation()
+apn_issues = update_fc_from_dict(differences_master, 'APN', parcelMaster,edit)
 if len(apn_issues)==0:
     print ("No issues with executing updates")
 else:
     print("There were issues with the following APNs")
     print(apn_issues)
+edit.stopEditing(True)
 
+edit.startEditing(False, True)
 
-#Update Geometry Parcels_Master
-#Need to define field list for parcel master
-fields = list(set(dfparcelMaster.columns) & set(dfparcelNew.columns))
+delete_old_parcels(parcelMaster, parcel_master_old_apn, edit)
 
-#DELETE? I think we already have this
-parcel_master_old_apn = old_new_parcels_list(featureLayer, parcelNew, 'No', 
-                                             prefix_remove,'Old APN')
-
-#INSERT AND DELETE PARCELS THAT HAVE CHANGED
-
-delete_old_parcels(featureLayer, parcel_master_old_apn)
-
-fields = arcpy.ListFields(featureLayer)
+fields = arcpy.ListFields(parcelMaster)
 field_names_master = [field.name for field in fields ]
 fields_new = arcpy.ListFields(parcelNew)
 field_names_new = [field.name for field in fields_new ]
 
 common_fields = list(set(field_names_master) & set(field_names_new))
-insert_new_parcels(featureLayer, parcel_master_new_apn, parcelNew, common_fields)
+insert_new_parcels(parcelMaster, parcel_master_new_apn, parcelNew, common_fields, edit)
 
-update_parcel_geometry(featureLayer, parcelNew)
+#update_parcel_geometry(parcelMaster, parcelNew, edit)
+edit.stopEditing(True)
 
+edit = arcpy.da.Editor('db_connections/ConnectionFile.sde')
+edit.startEditing(False, True)
+
+update_parcel_geometry(parcelMaster, parcelNew, edit)
+edit.stopEditing(True)
 # UPDATE PARCEL BASE
 
 # set up mapping for conversion from feature class to data frame
@@ -509,12 +535,12 @@ data_type_mapping = {
 
 fields_to_exclude = ['SHAPE']
 dfparcelNew = generate_spatial_dataframe(parcelNew, data_type_mapping, fields_to_exclude)
-dfparcelBase = generate_spatial_dataframe(featureLayer_Base, data_type_mapping, fields_to_exclude)
+dfparcelBase = generate_spatial_dataframe(parcelBase, data_type_mapping, fields_to_exclude)
 
 # filter to new parcels within TRPA boundary
 dfparcelNew=dfparcelNew.loc[dfparcelNew['WITHIN_TRPA_BNDY']==1]
 #df_special_parcels = pd.read_excel("//Trpa-fs01/GIS/PARCELUPDATE/Workspace/special_parcels.xlsx")
-matching_apns_parcel_base = return_matching_apns(featureLayer_Base, parcelNew, df_special_parcels)
+matching_apns_parcel_base = return_matching_apns(parcelBase, parcelNew, df_special_parcels)
 
 # filter parcel master to matching APNs
 dfparcelBase = dfparcelBase[dfparcelBase['APN'].isin(matching_apns_parcel_base)]
@@ -531,37 +557,67 @@ print(len(differences_base))
 df_dif=pd.DataFrame(differences_base)
 df_dif.to_csv('base_differences.csv')
 
+arcpy.ChangeVersion_management(parcelBase,'TRANSACTIONAL', version_name_full, '')
+edit = arcpy.da.Editor('db_connections/ConnectionFile.sde')
+edit.startEditing(False, True)
 
-update_fc_from_dict(differences_base, 'APN', featureLayer_Base)
+if len(differences_base)==0:
+    print('No changes to base attributes')
+else:
+    apn_issues = update_fc_from_dict(differences_base, 'APN', parcelBase, edit)
+    if len(apn_issues)==0:
+        print ("No issues with executing updates")
+    else:
+        print("There were issues with the following APNs")
+        print(apn_issues)
 
+edit.stopEditing(True)
 #Geometry Updates
 fields = ['APN','PPNO','PARCEL_ACRES','PARCEL_SQFT','JURISDICTION','SHAPE@']
-delete_old_parcels(featureLayer_Base, parcel_base_old_apn)
-insert_new_parcels(featureLayer_Base, parcel_base_new_apn, parcelNew, fields)
-update_parcel_geometry(featureLayer_Base, parcelNew)
 
-#Update new_old
+edit.startEditing(False, True)
+delete_old_parcels(parcelBase, parcel_base_old_apn, edit)
+insert_new_parcels(parcelBase, parcel_base_new_apn, parcelNew, fields, edit)
+edit.stopEditing(True)
+
+edit.startEditing(False, True)
+update_parcel_geometry(parcelBase, parcelNew, edit)
+# Stop the edit operation
+
+# Save the edits and stop the edit session
+edit.stopEditing(True)
+
+#We need to create a connection to Base
+server_name = "sql12"
+database_name = "sde_tabular"
+username = "sde"
+password = "staff"
+#change to include date dynamically
+#version_name = "parcel_update_10182023"
+
+# Create a new connection to the enterprise geodatabase in the script directory
+#enterprise_connection = os.path.join(script_directory, "EnterpriseDBConnection.sde")
+
+arcpy.CreateDatabaseConnection_management(
+    out_folder_path='db_connections/',
+    out_name="ConnectionFile_Tabular.sde",
+    database_platform="SQL_SERVER",  # Replace with your DBMS type (e.g., ORACLE, SQL_SERVER, POSTGRESQL)
+    instance=server_name,
+    database=database_name,
+    account_authentication="DATABASE_AUTH",  # Use "OPERATING_SYSTEM" for OS authentication
+    username=username,
+    password=password,
+    version_type='TRANSACTIONAL'
+)
+
+filepath = "//Trpa-fs01/GIS/PARCELUPDATE/Workspace/Parcel_Old_New/"
+parcel_list_name = "Parcel_Old_New" + strftime("%Y-%m-%d")+".csv"
+df_parcel_changes.to_csv(filepath+parcel_list_name, index=False)
+
+inWorkspace = 'db_connections/ConnectionFile_Tabular.sde'
+arcpy.env.workspace = inWorkspace
+
 try:
-    field_mapping = arcpy.FieldMappings()
-
-    field_mapping_info = [('APN', 'APN'), ('Status', 'Status'), ('TRPA_Boundary','TRPA_Boundary'), ('DiscoveryDate','DiscoveryDate')]
-
-    for source_field, target_field in field_mapping_info:
-        field_map = arcpy.FieldMap()
-        field_map.addInputField(df_parcel_changes, source_field)
-        output_field = field_map.outputField
-        output_field.name = target_field
-        field_map.outputField = output_field
-        field_mapping.addFieldMap(field_map)
-
-    np_array = df_parcel_changes.to_records(index=False)
-
-    #Need to update to point at the Parcel_NewOld Table
-    with arcpy.da.InsertCursor(parcelAPNOldNew, [target_field for _, target_field in field_mapping_info]) as cursor:
-        for row in np_array:
-            cursor.insertRow(row)
+    arcpy.management.Append(filepath+parcel_list_name, 'Parcel_APN_NewOld', schema_type="NO_TEST")    
 except Exception as e:
     print (f"Issue with updating list of new and old parcels: {e}")
-    parcel_list_name = "Parcel_Update_" + strftime("%Y-%m-%d")+".csv"
-    df_parcel_changes.to_csv(parcel_list_name)
-    
