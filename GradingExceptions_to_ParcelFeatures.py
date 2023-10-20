@@ -22,8 +22,8 @@ This script runs nightly at 10pm on Arc10 from scheduled task "Grading Exception
 # from boxsdk import OAuth2, Client
 
 # # Set up your Box API credentials
-# client_id = 'YOUR_CLIENT_ID'
-# client_secret = 'YOUR_CLIENT_SECRET'
+# client_id = 'pusxamhqx4urav2lj847darrr1niydzp'
+# client_secret = 'tmnxqxp8sSY6i24OPX2bAYFrnIA3cerZ'
 # access_token = 'YOUR_ACCESS_TOKEN'
 
 # # Authenticate with Box
@@ -135,15 +135,15 @@ def send_mail(body):
 #             smtpObj.login(sender_email, password)
             smtpObj.sendmail(sender_email, receiver_email, msg.as_string())
     except Exception as e:
-        print(e)
+        logger.error(e)
 
 # replaces features in outfc with exact same schema
-def updateSDE(inputfc,outfc, fieldnames):
+def updateSDE(inputfc,outfc, fieldnames, log):
     # deletes all rows from the SDE feature class
     arcpy.TruncateTable_management(outfc)
-    logger.info("\nDeleted all records in: {}\n".format(outfc))
+    log.info("\nDeleted all records in: {}\n".format(outfc))
     from time import strftime  
-    logger.info("Started data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
+    log.info("Started data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
     # insert rows from Temporary feature class to SDE feature class
     with arcpy.da.InsertCursor(outfc, fieldnames) as oCursor:
         count = 0
@@ -152,10 +152,9 @@ def updateSDE(inputfc,outfc, fieldnames):
                 oCursor.insertRow(row)
                 count += 1
                 if count % 100 == 0:
-                    logger.info("Inserting record %d into %s SDE feature class" % (count, outfc))
-            logger.info("Finished data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
-            logger.info("Done updating: %s"%(outfc))
-            logger.info("\nDone updating: %s"%(outfc))
+                    log.info("Inserting record %d into %s SDE feature class" % (count, outfc))
+            log.info("Finished data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
+            log.info("\nDone updating: %s"%(outfc))
 
 try:
     #---------------------------------------------------------------------------------------#
@@ -199,14 +198,14 @@ try:
     dfOut.spatial.to_featureclass(outFC)
 
     # confirm feature class was created
-    print("\nUpdated staging layer: " + outFC)
+    logger.info("\nUpdated staging layer: " + outFC)
 
     #---------------------------------------------------------------------------------------#
 
     #---------------------------------------------------------------------------------------#
     # report how long it took to get the data
     endTimer = datetime.now() - startTimer
-    print("\nTime it took to create staging layers: {}".format(endTimer))       
+    logger.info("\nTime it took to create staging layers: {}".format(endTimer))       
     #---------------------------------------------------------------------------------------#
 
     ##--------------------------------------------------------------------------------------------------------#
@@ -219,13 +218,13 @@ try:
     #---------------------------------------------------------------------------------------#
 
     # disconnect all users
-    print("\nDisconnecting all users...")
+    logger.info("\nDisconnecting all users...")
     arcpy.DisconnectUser(sdeCollect, "ALL")
 
     # unregister the sde feature class as versioned
-    print ("\nUnregistering feature dataset as versioned...")
+    logger.info("\nUnregistering feature dataset as versioned...")
     arcpy.UnregisterAsVersioned_management(fdata,"NO_KEEP_EDIT","COMPRESS_DEFAULT")
-    print ("\nFinished unregistering feature dataset as versioned.")
+    logger.info("\nFinished unregistering feature dataset as versioned.")
     #---------------------------------------------------------------------------------------#
     # Update Parcel_GradingExceptions
 
@@ -245,7 +244,7 @@ try:
     fieldnames = [field.name if field.name != 'Shape' else 'SHAPE@' for field in fields if field.name not in out_fields]
 
     # update function (input, output, fields)
-    updateSDE(inputFC, updateFC, fieldnames)
+    updateSDE(inputFC, updateFC, fieldnames, logger)
 
     ##--------------------------------------------------------------------------------------------------------#
     ## END OF UPDATES ##
@@ -262,30 +261,24 @@ try:
 
     # report how long it took to run the script
     FINALendTimer = datetime.now() - FIRSTstartTimer
-    print ("\nTime it took to run this script: {}".format(FINALendTimer))
-
     logger.info("\nTime it took to run this script: {}".format(FINALendTimer))
    
     header = "SUCCESS - The Grading Exception feature class was updated."
     # send email with header based on try/except result
     send_mail(header)
-    print('Sending email...')
 
 # catch any arcpy errors
 except arcpy.ExecuteError:
-    print(arcpy.GetMessages())
     logger.error(arcpy.GetMessages())
     header = "ERROR - Arcpy Exception - Check Log"
     # send email with header based on try/except result
     send_mail(header)
-    print('Sending email...')
 
 # catch system errors
 except Exception:
     e = sys.exc_info()[1]
-    print(e.args[0])
+    logger.info(e.args[0])
     logger.error(e)
     header = "ERROR - System Error - Check Log"
     # send email with header based on try/except result
     send_mail(header)
-    print('Sending email...')
