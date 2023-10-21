@@ -5,9 +5,10 @@ import os
 # network path to connection files
 filePath   = "C:\\GIS\\DB_CONNECT"
 sdeBase    = os.path.join(filePath, "Vector.sde")
-parcelBase     = sdeBase + "\\sde.SDE.Parcels\\sde.SDE.Parcels_Base"
+parcelBase = os.path.join(sdeBase, 'SDE.Parcels\SDE.Parcels_Base')
+
 #  make feature layer from parcel base
-feature_layer_name = arcpy.MakeFeatureLayer_management(parcelBase, "parcels_lyr")
+feature_layer_name = arcpy.management.MakeFeatureLayer(parcelBase, "Parcel_Layer")
 
 # def get_parcel_wkt_list(featureLayer):
     
@@ -27,11 +28,16 @@ feature_layer_name = arcpy.MakeFeatureLayer_management(parcelBase, "parcels_lyr"
 def post_parcel_geom_update(featureLayer, url):
     # Use a SearchCursor to iterate through the features
     with arcpy.da.SearchCursor(featureLayer, ['SHAPE@WKT', 'APN']) as cursor:
+        total_count = 0
         for row in cursor:
+            total_count +=1
+            if (total_count%1000)==0:
+                print(f"Updating row {total_count}")
             feature_dict = {
                 'APN': row[1],
                 'WKT': row[0]
             }
+            print(feature_dict)
             requests.post(url, feature_dict)
 
 # feature_list = get_parcel_wkt_list(feature_layer_name)

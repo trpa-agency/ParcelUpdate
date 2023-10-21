@@ -1,7 +1,7 @@
 """
 GradingExceptions_to_ParcelFeatures.py
 Created: October 13th, 2023
-Last Updated: October 19th, 2023
+Last Updated: October 20th, 2023
 Mason Bindl, Tahoe Regional Planning Agency
 Amy Fish, Tahoe Regional Planning Agency
 Andy McClary, Tahoe Regional Planning Agency
@@ -18,23 +18,7 @@ with no need for installing new libraries.
 This script runs nightly at 10pm on Arc10 from scheduled task "Grading Exception ETL"
 """
 
-#-------------------------------------------------------------------------------------------------------------------#
-# from boxsdk import OAuth2, Client
-
-# # Set up your Box API credentials
-# client_id = 'pusxamhqx4urav2lj847darrr1niydzp'
-# client_secret = 'tmnxqxp8sSY6i24OPX2bAYFrnIA3cerZ'
-# access_token = 'YOUR_ACCESS_TOKEN'
-
-# # Authenticate with Box
-# oauth2 = OAuth2(client_id, client_secret, access_token)
-# client = Client(oauth2)
-
-# # Find the file in your Box folder (replace 'file_name.csv' with the actual file name)
-# file_name = 'file_name.csv'
-# # box_file = client.folder(folder_id).get_items(name=file_name)[0]
-# with open(file_name, 'wb') as f:
-#     box_file.download_to(f)
+#-------------------------------------------------------------------------------------------------------------------
 # import packages
 import pandas as pd
 import arcpy
@@ -45,6 +29,7 @@ from arcgis.features import FeatureSet, GeoAccessor, GeoSeriesAccessor
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from boxsdk import OAuth2, Client
 
 # set overwrite to true
 arcpy.env.overwriteOutput = True
@@ -81,6 +66,32 @@ FIRSTstartTimer = datetime.now()
 
 # Log different types of messages
 logger.info("Script Started: " + str(FIRSTstartTimer) + "\n")
+#---------------------------------------------------------------------------------------#
+# GET DATA FROM BOX
+# Box API credentials
+clientId        = 'pusxamhqx4urav2lj847darrr1niydzp'
+clientSecret    = 'tmnxqxp8sSY6i24OPX2bAYFrnIA3cerZ'
+accessToken     = 'h7L820o8GHUBulCR5yv7Ckkk9fZWAa5B'
+# setup box connection
+oauth2 = OAuth2(clientId, clientSecret, access_token=accessToken)
+client = Client(oauth2)
+
+# grading exception BOX file id
+fileID = '1337039879890'
+
+# Get the file object
+file = client.file(fileID).get()
+
+if file:
+    # local file to overwrite
+    local_file_path = "//trpa-fs01/GIS/Acella/Reports/Grading_Exception_Map.csv"
+
+    # Download and save the file
+    with open(local_file_path, 'wb') as local_file:
+        file.download_to(local_file)
+    logger.info(f'File downloaded and saved as: {local_file_path}')
+else:
+    logger.info(f'Error downloading file. File not found.')
 
 #---------------------------------------------------------------------------------------#
 # start timer for the get data requests
