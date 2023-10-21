@@ -1,6 +1,6 @@
 """
-GradingExceptions_to_ParcelFeatures.py
-Created: October 13th, 2023
+GradingExceptions_to_ParcelFeatures_ETL.py
+Created: October 15th, 2023
 Last Updated: October 20th, 2023
 Mason Bindl, Tahoe Regional Planning Agency
 Amy Fish, Tahoe Regional Planning Agency
@@ -17,7 +17,6 @@ with no need for installing new libraries.
 
 This script runs nightly at 10pm on Arc10 from scheduled task "Grading Exception ETL"
 """
-
 #-------------------------------------------------------------------------------------------------------------------
 # import packages
 import pandas as pd
@@ -50,7 +49,6 @@ sdeCollect = os.path.join(filePath, "Collection.sde")
 # Feature dataset to unversion and register as version
 fdata = sdeCollect + "\\sde_collection.SDE.Parcel"
 
-
 # Configure the logging
 log_file_path = os.path.join(working_folder, "GradingException.log")  # Specify the path to your local directory
 logging.basicConfig(level=logging.DEBUG,
@@ -66,50 +64,6 @@ FIRSTstartTimer = datetime.now()
 
 # Log different types of messages
 logger.info("Script Started: " + str(FIRSTstartTimer) + "\n")
-#---------------------------------------------------------------------------------------#
-# GET DATA FROM BOX
-# Box API credentials
-clientId        = 'pusxamhqx4urav2lj847darrr1niydzp'
-clientSecret    = 'tmnxqxp8sSY6i24OPX2bAYFrnIA3cerZ'
-accessToken     = 'h7L820o8GHUBulCR5yv7Ckkk9fZWAa5B'
-# setup box connection
-oauth2 = OAuth2(clientId, clientSecret, access_token=accessToken)
-client = Client(oauth2)
-
-# grading exception BOX file id
-fileID = '1337039879890'
-
-# Get the file object
-file = client.file(fileID).get()
-
-if file:
-    # local file to overwrite
-    local_file_path = "//trpa-fs01/GIS/Acella/Reports/Grading_Exception_Map.csv"
-
-    # Download and save the file
-    with open(local_file_path, 'wb') as local_file:
-        file.download_to(local_file)
-    logger.info(f'File downloaded and saved as: {local_file_path}')
-else:
-    logger.info(f'Error downloading file. File not found.')
-
-#---------------------------------------------------------------------------------------#
-# start timer for the get data requests
-startTimer = datetime.now()
-
-# local csv file location
-accelaFiles = "//trpa-fs01/GIS/Acella/Reports"
-# make dataframes from exported accela views
-dfGrade = pd.read_csv(os.path.join(accelaFiles, "Grading_Exception_Map.csv"))
-
-# create spatial dataframe from parcel master in sde
-parcels = sdeBase + "\\sde.SDE.Parcels\\sde.SDE.Parcel_Master"
-sdfParcels = pd.DataFrame.spatial.from_featureclass(parcels)
-       
-# report how long it took to get the data
-endTimer = datetime.now() - startTimer
-
-logger.info("\nTime it took to get the data: {}".format(endTimer))   
 
 #---------------------------------------------------------------------------------------#
 ## Define Functions ##
@@ -125,7 +79,7 @@ sender_email = "infosys@trpa.org"
 # password = ''
 receiver_email = "gis@trpa.gov"
 
-
+# send email with attachments
 def send_mail(body):
     msg = MIMEMultipart()
     msg['Subject'] = subject
@@ -167,6 +121,56 @@ def updateSDE(inputfc,outfc, fieldnames, log):
             log.info("Finished data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
             log.info("\nDone updating: %s"%(outfc))
 
+
+#---------------------------------------------------------------------------------------#
+# EXTRACT DATA FROM BOX
+#---------------------------------------------------------------------------------------#
+# Box API credentials
+clientId        = 'pusxamhqx4urav2lj847darrr1niydzp'
+clientSecret    = 'tmnxqxp8sSY6i24OPX2bAYFrnIA3cerZ'
+accessToken     = 'h7L820o8GHUBulCR5yv7Ckkk9fZWAa5B'
+
+# setup box connection
+oauth2 = OAuth2(clientId, clientSecret, access_token=accessToken)
+client = Client(oauth2)
+
+# grading exception BOX file id
+fileID = '1337039879890'
+
+# Get the file object
+file = client.file(fileID).get()
+
+if file:
+    # local file to overwrite
+    local_file_path = "//trpa-fs01/GIS/Acella/Reports/Grading_Exception_Map.csv"
+
+    # Download and save the file
+    with open(local_file_path, 'wb') as local_file:
+        file.download_to(local_file)
+    logger.info(f'File downloaded and saved as: {local_file_path}')
+else:
+    logger.info(f'Error downloading file. File not found.')
+
+#---------------------------------------------------------------------------------------#
+# TRANSFORM DATA
+#---------------------------------------------------------------------------------------#
+# start timer for the get data requests
+startTimer = datetime.now()
+
+# local csv file location
+accelaFiles = "//trpa-fs01/GIS/Acella/Reports"
+# make dataframes from exported accela views
+dfGrade = pd.read_csv(os.path.join(accelaFiles, "Grading_Exception_Map.csv"))
+
+# create spatial dataframe from parcel master in sde
+parcels = sdeBase + "\\sde.SDE.Parcels\\sde.SDE.Parcel_Master"
+sdfParcels = pd.DataFrame.spatial.from_featureclass(parcels)
+       
+# report how long it took to get the data
+endTimer = datetime.now() - startTimer
+
+logger.info("\nTime it took to get the data: {}".format(endTimer))   
+# creating staging data
 try:
     #---------------------------------------------------------------------------------------#
     ## CREATE STAGING LAYER ##
@@ -210,23 +214,16 @@ try:
 
     # confirm feature class was created
     logger.info("\nUpdated staging layer: " + outFC)
-
-    #---------------------------------------------------------------------------------------#
-
-    #---------------------------------------------------------------------------------------#
     # report how long it took to get the data
     endTimer = datetime.now() - startTimer
-    logger.info("\nTime it took to create staging layers: {}".format(endTimer))       
-    #---------------------------------------------------------------------------------------#
+    logger.info("\nTime it took to create staging layers: {}".format(endTimer))
 
-    ##--------------------------------------------------------------------------------------------------------#
-    ## BEGIN SDE UPDATES ##
-    ##--------------------------------------------------------------------------------------------------------#
-
-    #---------------------------------------------------------------------------------------#
+    #--------------------------------------------------------------------------------------------------------#
+    # LOAD DATA TO COLLECTION SDE
+    #--------------------------------------------------------------------------------------------------------#
+    
     # start timer for the get data requests
     startTimer = datetime.now()
-    #---------------------------------------------------------------------------------------#
 
     # disconnect all users
     logger.info("\nDisconnecting all users...")
@@ -236,7 +233,6 @@ try:
     logger.info("\nUnregistering feature dataset as versioned...")
     arcpy.UnregisterAsVersioned_management(fdata,"NO_KEEP_EDIT","COMPRESS_DEFAULT")
     logger.info("\nFinished unregistering feature dataset as versioned.")
-    #---------------------------------------------------------------------------------------#
     # Update Parcel_GradingExceptions
 
     # input staging feature class
@@ -254,12 +250,8 @@ try:
     out_fields = [dsc.OIDFieldName, dsc.lengthFieldName, dsc.areaFieldName]
     fieldnames = [field.name if field.name != 'Shape' else 'SHAPE@' for field in fields if field.name not in out_fields]
 
-    # update function (input, output, fields)
+    # update SDE function (input, output, fields)
     updateSDE(inputFC, updateFC, fieldnames, logger)
-
-    ##--------------------------------------------------------------------------------------------------------#
-    ## END OF UPDATES ##
-    ##--------------------------------------------------------------------------------------------------------#
 
     # disconnect all users
     logger.info("\nDisconnecting all users...")
@@ -293,3 +285,7 @@ except Exception:
     header = "ERROR - System Error - Check Log"
     # send email with header based on try/except result
     send_mail(header)
+
+#--------------------------------------------------------------------------------------------------------#
+# THE END
+#--------------------------------------------------------------------------------------------------------#
