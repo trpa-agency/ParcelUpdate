@@ -1,6 +1,8 @@
 import arcpy
 import requests
 import os
+import time
+
 # import json
 # network path to connection files
 filePath   = "C:\\GIS\\DB_CONNECT"
@@ -10,11 +12,20 @@ parcelBase = os.path.join(sdeBase, 'SDE.Parcels\SDE.Parcels_Base')
 #  make feature layer from parcel base
 feature_layer_name = arcpy.management.MakeFeatureLayer(parcelBase, "Parcel_Layer")
 
-# def get_parcel_wkt_list(featureLayer):
-    
+# time a function function
+## use as decorator @timer
+def timer(func):
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        print(f"Function {func.__name__} took {end_time - start_time} seconds to execute.")
+        return result
+    return wrapper
+
+# def get_parcel_wkt_list(featureLayer):    
 #     # Define the list to store dictionaries
 #     feature_list = []
-
 #     # Use a SearchCursor to iterate through the features
 #     with arcpy.da.SearchCursor(featureLayer, ['SHAPE@WKT', 'APN']) as cursor:
 #         for row in cursor:
@@ -25,6 +36,7 @@ feature_layer_name = arcpy.management.MakeFeatureLayer(parcelBase, "Parcel_Layer
 #             feature_list.append(feature_dict)
 #     return feature_list
 
+@timer
 def post_parcel_geom_update(featureLayer, url):
     # Use a SearchCursor to iterate through the features
     with arcpy.da.SearchCursor(featureLayer, ['SHAPE@WKT', 'APN']) as cursor:
