@@ -1,7 +1,7 @@
 """
 CountyParcel_Transform.py
 Created: June 15th,2023
-Last Updated: June 15th, 2023
+Last Updated: October 20th, 2023
 Amy Fish, Tahoe Regional Planning Agency
 Andy McClary, Tahoe Regional Planning Agency
 Mason Bindl, Tahoe Regional Planning Agency
@@ -51,7 +51,6 @@ portal_pwd = str(os.environ.get('Password'))
 portal_url = "https://maps.trpa.org/portal/"
 # sign in
 arcpy.SignInToPortal(portal_url, portal_user, portal_pwd)
-
 
 # Parcel AOI to select parcels to keep (includes TRPA Boundary and Olympic Valley Watershed)
 parcelAOI = "Parcel_AOI"
@@ -193,6 +192,33 @@ trpaFields = [
 ["PARCEL_SQFT_TRPA", "DOUBLE", "Square Feet"] 
 ]
 
+#----------------------------------------------------------------------
+# LOGGING
+#----------------------------------------------------------------------
+# Configure the logging
+log_file_path = os.path.join(workspace, "ParcelTransformation.log")  # Specify the path to your local directory
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    filename=log_file_path,  # Set the log file path
+                    filemode='w')
+
+# Create a logger
+logger = logging.getLogger(__name__)
+# start a timer for the entire script run
+FIRSTstartTimer = datetime.now()
+# Log different types of messages
+logger.info("Script Started: " + str(FIRSTstartTimer) + "\n")
+
+##--------------------------------------------------------------------------------------------------------#
+## SETUP SEND EMAIL WITH LOG FILE ##
+##--------------------------------------------------------------------------------------------------------#
+# path to text file
+fileToSend = log_file_path
+# email parameters
+subject = "Grading Exception ETL Log File"
+sender_email = "infosys@trpa.org"
+# password = ''
+receiver_email = "gis@trpa.gov"
 #----------------------------------------------------------------------
 # FUNCTIONS
 #----------------------------------------------------------------------
@@ -547,9 +573,9 @@ def generate_spatial_dataframe(feature_class, data_type_mapping, fields_to_exclu
 
     # Create a pandas DataFrame from the dictionary
     df = pd.DataFrame(data)
-
     return df
 
+@timer
 def get_text_fields(feature_class):
     field_list = []
     fields = arcpy.ListFields(feature_class)
@@ -559,9 +585,28 @@ def get_text_fields(feature_class):
     return field_list
 
 
-#----------------------------------------------------------------------
-# LOGGING
-#----------------------------------------------------------------------
+# send email with attachments
+def send_mail(body):
+    msg = MIMEMultipart()
+    msg['Subject'] = subject
+    msg['From'] = sender_email
+    msg['To'] = receiver_email
+
+    msgText = MIMEText('%s<br><br>Cheers,<br>GIS Team' % (body), 'html')
+    msg.attach(msgText)
+
+    attachment = MIMEText(open(fileToSend).read())
+    attachment.add_header("Content-Disposition", "attachment", filename = os.path.basename(fileToSend))
+    msg.attach(attachment)
+
+    try:
+        with smtplib.SMTP("mail.smtp2go.com", 25) as smtpObj:
+            smtpObj.ehlo()
+            smtpObj.starttls()
+#             smtpObj.login(sender_email, password)
+            smtpObj.sendmail(sender_email, receiver_email, msg.as_string())
+    except Exception as e:
+        logger.error(e)
 
 #-----------------------------------------------------------------------
 # CARSON COUNTY TRANSFORMATION
