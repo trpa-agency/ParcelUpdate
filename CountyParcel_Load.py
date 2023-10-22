@@ -300,7 +300,6 @@ def insert_new_parcels(featureLayer, new_APNs, new_parcels, fields, edit_session
 def generate_updated_shape_wkt(featureLayer, wkt_file_name):
     # Open the output text file for writing
     with open(wkt_file_name, "w") as wkt_file:
-
         # Write headers for your fields    
         field_names = ["APN"]  
         # Replace with your field names    
@@ -313,12 +312,10 @@ def generate_updated_shape_wkt(featureLayer, wkt_file_name):
             field1_value,  wkt_geometry = row        
             row_data = [field1_value, wkt_geometry]
             wkt_file.write("\t".join(map(str, row_data)) + "\n")
-
         # Clean up by deleting the cursor
         del cursor
 
 # updates @SHAPE that aren't identical to existing shapes
-
 @timer
 def update_parcel_geometry(featureLayer, new_parcels, edit_session):
     newShapes = arcpy.management.SelectLayerByLocation(
@@ -381,7 +378,6 @@ def get_text_fields(feature_class):
     return field_list
 
 #Create database connection
-
 inWorkspace = "//Trpa-fs01\GIS\PARCELUPDATE\Workspace\Vector.sde"
 arcpy.env.workspace = inWorkspace
 # Specify the name of the new version and the parent version
