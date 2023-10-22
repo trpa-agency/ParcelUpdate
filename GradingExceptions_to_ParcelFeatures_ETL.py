@@ -22,6 +22,7 @@ This script runs nightly at 10pm on Arc10 from scheduled task "Grading Exception
 import pandas as pd
 import arcpy
 import os
+import sys
 import logging
 from datetime import datetime
 from arcgis.features import FeatureSet, GeoAccessor, GeoSeriesAccessor
