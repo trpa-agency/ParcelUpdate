@@ -129,7 +129,7 @@ def updateSDE(inputfc,outfc, fieldnames, log):
 # Box API credentials
 clientId        = 'pusxamhqx4urav2lj847darrr1niydzp'
 clientSecret    = 'tmnxqxp8sSY6i24OPX2bAYFrnIA3cerZ'
-accessToken     = 'h7L820o8GHUBulCR5yv7Ckkk9fZWAa5B'
+accessToken     = '0H8G8Pq1Ze8OAimuuHUFixvrHVvOWyU2'
 
 # setup box connection
 oauth2 = OAuth2(clientId, clientSecret, access_token=accessToken)
