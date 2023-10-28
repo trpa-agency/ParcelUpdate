@@ -3,14 +3,30 @@ import requests
 import os
 import time
 
-# import json
+# setupe
+arcpy.env.workspace = "C:\GIS\Scratch.gdb"
+arcpy.env.overwriteOutput = True
+
 # network path to connection files
 filePath   = "C:\\GIS\\DB_CONNECT"
 sdeBase    = os.path.join(filePath, "Vector.sde")
 parcelBase = os.path.join(sdeBase, 'SDE.Parcels\SDE.Parcels_Base')
 
+# in memory fcs to use in the attribution stage
+memory = "memory" + "\\"
+
+#output projected in-memory feature class
+parcelLayerProjected = "ParcelLayerProjected"
+
+# Set output coordinate system
+outCS = arcpy.SpatialReference(4326)
+
+# run project tool
+arcpy.Project_management(parcelBase, parcelLayerProjected, outCS)
+
+where = "APN IN ('029-041-009', '016-091-020', '090-225-018')"
 #  make feature layer from parcel base
-feature_layer_name = arcpy.management.MakeFeatureLayer(parcelBase, "Parcel_Layer")
+parcelLayer = arcpy.management.MakeFeatureLayer("ParcelLayerProjected", "Parcel_Layer", where_clause=where)
 
 # time a function function
 ## use as decorator @timer
@@ -23,19 +39,7 @@ def timer(func):
         return result
     return wrapper
 
-# def get_parcel_wkt_list(featureLayer):    
-#     # Define the list to store dictionaries
-#     feature_list = []
-#     # Use a SearchCursor to iterate through the features
-#     with arcpy.da.SearchCursor(featureLayer, ['SHAPE@WKT', 'APN']) as cursor:
-#         for row in cursor:
-#             feature_dict = {
-#                 'APN': row[1],
-#                 'WKT': row[0]
-#             }
-#             feature_list.append(feature_dict)
-#     return feature_list
-
+# create dictionary to post
 @timer
 def post_parcel_geom_update(featureLayer, url):
     # Use a SearchCursor to iterate through the features
@@ -52,19 +56,6 @@ def post_parcel_geom_update(featureLayer, url):
             print(feature_dict)
             requests.post(url, feature_dict)
 
-# feature_list = get_parcel_wkt_list(feature_layer_name)
-
-# test_feature_list = feature_list[0:3]
-
-# json_url = "https://qa.laketahoeinfo.org/api/UpdateParcelGeometries/1A77D078-B83E-44E0-8CA5-8D7429E1A6B4"
-# data={"parcelGeometriesToUpdate": test_feature_list}
-
-# headers = {
-#     "Content-Type": "application/json"
-# }
-# data_json = json.dumps(data)
-# # note: not sure this post is the correct python code
-# response = requests.post(json_url, data=json.dumps(data), headers=headers)
-
+# post geometries
 post_url = 'https://qa.laketahoeinfo.org/api/UpdateParcelGeometry/1A77D078-B83E-44E0-8CA5-8D7429E1A6B4'
-post_parcel_geom_update(feature_layer_name, post_url)
+post_parcel_geom_update(parcelLayer, post_url)

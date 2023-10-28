@@ -52,6 +52,14 @@ sdeCollect = os.path.join(filePath, "Collection.sde")
 # Feature dataset to unversion and register as version
 fdata = sdeCollect + "\\sde_collection.SDE.Parcel"
 
+# Box API credentials
+clientId        = 'pusxamhqx4urav2lj847darrr1niydzp'
+clientSecret    = 'tmnxqxp8sSY6i24OPX2bAYFrnIA3cerZ'
+accessToken     = '0H8G8Pq1Ze8OAimuuHUFixvrHVvOWyU2'
+
+# setup box connection
+oauth2 = OAuth2(clientId, clientSecret, access_token=accessToken)
+client = Client(oauth2)
 # start a timer for the entire script run
 FIRSTstartTimer = datetime.now()
 
@@ -66,59 +74,6 @@ log.write("\n")
 log.write("Begin process:\n")
 log.write("Process started at: " + str(FIRSTstartTimer) + "\n")
 log.write("\n")
-
-#---------------------------------------------------------------------------------------#
-## GET DATA
-#---------------------------------------------------------------------------------------#
-# start timer for the get data requests
-startTimer = datetime.now()
-
-#
-connection_string = "DRIVER={ODBC Driver 17 for SQL Server};SERVER=sql14;DATABASE=tahoebmpsde;UID=sde;PWD=staff"
-connection_url = URL.create("mssql+pyodbc", query={"odbc_connect": connection_string})
-engine = create_engine(connection_url)
-
-with engine.begin() as bmpConnect:
-    dfBMP      = pd.read_sql("SELECT * FROM tahoebmpsde.dbo.v_BMPStatus", bmpConnect)
-
-# # make sql database connection to BMP with pyodbc
-# bmpConnect = pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server};SERVER=sql14;DATABASE=tahoebmpsde;UID=sde;PWD=staff')
-# # BMP - create dataframe from tahoebmpsde table
-# dfBMP      = pd.read_sql("SELECT * FROM tahoebmpsde.dbo.v_BMPStatus", bmpConnect)
-
-# # make sql database connection to Accela with pyodbc
-# accConnect = pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server};SERVER=ASQL;DATABASE=Accela;UID=BMP_Update;PWD=BMP_update_123')
-# # Accela - create dataframes from sql tables
-# dfLCV      = pd.read_sql("SELECT * FROM Accela.dbo.v_LandCapabilityVerifications", accConnect)
-# dfLCC      = pd.read_sql("SELECT * FROM Accela.dbo.v_LandCapabilityChallenges", accConnect)  
-# dfSoil     = pd.read_sql("SELECT * FROM Accela.dbo.v_HydroSoilsProjects", accConnect)
-# dfHist     = pd.read_sql("SELECT * FROM Accela.dbo.v_HistoricDeterminations", accConnect)
-# dfGrade    = pd.read_sql("SELECT * FROM Accela.dbo.v_GradingExceptions", accConnect)
-
-# make dataframes from exported accela views
-accelaFiles = "//trpa-fs01/GIS/Acella/Reports"
-dfLCV      = pd.read_csv(os.path.join(accelaFiles, "v_landcapabilityverifications.csv"))
-dfLCC      = pd.read_csv(os.path.join(accelaFiles, "v_landcapabilityChallenges.csv"))
-dfSoil     = pd.read_csv(os.path.join(accelaFiles, "v_hydrosoilsprojects.csv"))
-dfHist     = pd.read_csv(os.path.join(accelaFiles, "v_historicdeterminations.csv"))
-dfGrade    = pd.read_csv(os.path.join(accelaFiles, "v_gradingexceptions.csv"))
-
-# LTInfo - create dataframes from JSON found here: https://laketahoeinfo.org/WebServices/List
-dfLTAPN    = pd.read_json("https://laketahoeinfo.org/WebServices/GetAllParcels/JSON/e17aeb86-85e3-4260-83fd-a2b32501c476")
-dfIPES     = pd.read_json("https://laketahoeinfo.org/WebServices/GetParcelIPESScores/JSON/e17aeb86-85e3-4260-83fd-a2b32501c476")
-dfLCVinfo  = pd.read_json("https://laketahoeinfo.org/WebServices/GetParcelsByLandCapability/JSON/e17aeb86-85e3-4260-83fd-a2b32501c476")
-dfDRBank   = pd.read_json("https://laketahoeinfo.org/WebServices/GetBankedDevelopmentRights/JSON/e17aeb86-85e3-4260-83fd-a2b32501c476")
-dfDRTrans  = pd.read_json("https://laketahoeinfo.org/WebServices/GetTransactedAndBankedDevelopmentRights/JSON/e17aeb86-85e3-4260-83fd-a2b32501c476")
-dfDeed     = pd.read_json("https://laketahoeinfo.org/WebServices/GetDeedRestrictedParcels/JSON/e17aeb86-85e3-4260-83fd-a2b32501c476")
-
-# create spatial dataframe from parcel master in sde
-parcels = sdeBase + "\\sde.SDE.Parcels\\sde.SDE.Parcel_Master"
-sdfParcels = pd.DataFrame.spatial.from_featureclass(parcels)
-       
-# report how long it took to get the data
-endTimer = datetime.now() - startTimer
-print("\nTime it took to get the data: {}".format(endTimer))   
-log.write("\nTime it took to get the data: {}".format(endTimer)) 
 #---------------------------------------------------------------------------------------#
 ## Define Functions ##
 #---------------------------------------------------------------------------------------#
@@ -126,15 +81,14 @@ log.write("\nTime it took to get the data: {}".format(endTimer))
 ## SEND EMAIL WITH LOG FILE ##
 ##--------------------------------------------------------------------------------------------------------#
 # path to text file
-fileToSend = complete_txt_path
-
+fileToSend = log_file_path
 # email parameters
-subject = "Parcel ETL Log File"
+subject = "Grading Exception ETL Log File"
 sender_email = "infosys@trpa.org"
 # password = ''
 receiver_email = "gis@trpa.gov"
 
-
+# send email with attachments
 def send_mail(body):
     msg = MIMEMultipart()
     msg['Subject'] = subject
@@ -155,15 +109,15 @@ def send_mail(body):
 #             smtpObj.login(sender_email, password)
             smtpObj.sendmail(sender_email, receiver_email, msg.as_string())
     except Exception as e:
-        print(e)
+        logger.error(e)
 
 # replaces features in outfc with exact same schema
-def updateSDE(inputfc,outfc, fieldnames):
+def updateSDE(inputfc,outfc, fieldnames, log):
     # deletes all rows from the SDE feature class
     arcpy.TruncateTable_management(outfc)
-    print ("\nDeleted all records in: {}\n".format(outfc))
+    log.info("\nDeleted all records in: {}\n".format(outfc))
     from time import strftime  
-    print ("Started data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
+    log.info("Started data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
     # insert rows from Temporary feature class to SDE feature class
     with arcpy.da.InsertCursor(outfc, fieldnames) as oCursor:
         count = 0
@@ -171,11 +125,76 @@ def updateSDE(inputfc,outfc, fieldnames):
             for row in iCursor:
                 oCursor.insertRow(row)
                 count += 1
-                if count % 1000 == 0:
-                    print("Inserting record %d into %s SDE feature class" % (count, outfc))
-            print ("Finished data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
-            print("Done updating: %s"%(outfc))
-            log.write("\nDone updating: %s"%(outfc))
+                if count % 100 == 0:
+                    log.info("Inserting record %d into %s SDE feature class" % (count, outfc))
+            log.info("Finished data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
+            log.info("\nDone updating: %s"%(outfc))
+            
+# get box files
+def getBOXfiles(fileDict, client, local_folder, log):
+    for fileName, fileID in fileDict.items():
+        # Get the file object
+        file = client.file(fileID).get()
+        if file:
+            # local file to overwrite
+            local_file_path = os.path.join(local_folder, fileName)
+
+            # Download and save the file
+            with open(local_file_path, 'wb') as local_file:
+                file.download_to(local_file)
+                log.info(f'File downloaded and saved as: {local_file_path}')
+        else:
+            log.info(f'Error downloading file. File not found.')
+#---------------------------------------------------------------------------------------#
+## GET DATA
+#---------------------------------------------------------------------------------------#
+# start timer for the get data requests
+startTimer = datetime.now()
+
+# local path to stage csvs in
+accelaFiles = "//trpa-fs01/GIS/Acella/Reports"
+
+
+#
+connection_string = "DRIVER={ODBC Driver 17 for SQL Server};SERVER=sql14;DATABASE=tahoebmpsde;UID=sde;PWD=staff"
+connection_url = URL.create("mssql+pyodbc", query={"odbc_connect": connection_string})
+engine = create_engine(connection_url)
+
+with engine.begin() as bmpConnect:
+    dfBMP      = pd.read_sql("SELECT * FROM tahoebmpsde.dbo.v_BMPStatus", bmpConnect)
+
+# dictionary of csv name and box file ID
+fileDict = {'Land_Capable_Verifications.csv': "1342591986420",
+            'Land_Capability_Challenge.csv' : "1342590467197",
+            'Hyrdro_Soils.csv'              : "1342592456757",
+            'Grading_Exeption_Map.csv'      : "1337039879890",
+            'Historic_Designations.csv'     : "1342590117002"}
+
+# make dataframes from exported accela views
+
+dfLCV      = pd.read_csv(os.path.join(accelaFiles, 'Land_Capable_Verifications.csv'))
+dfLCC      = pd.read_csv(os.path.join(accelaFiles, 'Land_Capability_Challenge.csv'))
+dfSoil     = pd.read_csv(os.path.join(accelaFiles, 'Hyrdro_Soils.csv'))
+dfHist     = pd.read_csv(os.path.join(accelaFiles, 'Historic_Designations.csv'))
+dfGrade    = pd.read_csv(os.path.join(accelaFiles, 'Grading_Exeption_Map.csv'))
+
+# LTInfo - create dataframes from JSON found here: https://laketahoeinfo.org/WebServices/List
+dfLTAPN    = pd.read_json("https://laketahoeinfo.org/WebServices/GetAllParcels/JSON/e17aeb86-85e3-4260-83fd-a2b32501c476")
+dfIPES     = pd.read_json("https://laketahoeinfo.org/WebServices/GetParcelIPESScores/JSON/e17aeb86-85e3-4260-83fd-a2b32501c476")
+dfLCVinfo  = pd.read_json("https://laketahoeinfo.org/WebServices/GetParcelsByLandCapability/JSON/e17aeb86-85e3-4260-83fd-a2b32501c476")
+dfDRBank   = pd.read_json("https://laketahoeinfo.org/WebServices/GetBankedDevelopmentRights/JSON/e17aeb86-85e3-4260-83fd-a2b32501c476")
+dfDRTrans  = pd.read_json("https://laketahoeinfo.org/WebServices/GetTransactedAndBankedDevelopmentRights/JSON/e17aeb86-85e3-4260-83fd-a2b32501c476")
+dfDeed     = pd.read_json("https://laketahoeinfo.org/WebServices/GetDeedRestrictedParcels/JSON/e17aeb86-85e3-4260-83fd-a2b32501c476")
+dfPermits  = pd.read_csv("")
+# create spatial dataframe from parcel master in sde
+parcels = sdeBase + "\\sde.SDE.Parcels\\sde.SDE.Parcel_Master"
+sdfParcels = pd.DataFrame.spatial.from_featureclass(parcels)
+       
+# report how long it took to get the data
+endTimer = datetime.now() - startTimer
+print("\nTime it took to get the data: {}".format(endTimer))   
+log.write("\nTime it took to get the data: {}".format(endTimer)) 
+
 
 try:
     #---------------------------------------------------------------------------------------#
