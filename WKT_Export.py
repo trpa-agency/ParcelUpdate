@@ -3,7 +3,7 @@ import requests
 import os
 import time
 
-# setupe
+# setup
 arcpy.env.workspace = "C:\GIS\Scratch.gdb"
 arcpy.env.overwriteOutput = True
 
@@ -12,19 +12,18 @@ filePath   = "C:\\GIS\\DB_CONNECT"
 sdeBase    = os.path.join(filePath, "Vector.sde")
 parcelBase = os.path.join(sdeBase, 'SDE.Parcels\SDE.Parcels_Base')
 
-# in memory fcs to use in the attribution stage
-memory = "memory" + "\\"
-
 #output projected in-memory feature class
 parcelLayerProjected = "ParcelLayerProjected"
 
-# Set output coordinate system
+# Set output coordinate system to be WGS 1984
 outCS = arcpy.SpatialReference(4326)
 
 # run project tool
 arcpy.Project_management(parcelBase, parcelLayerProjected, outCS)
 
+# where clause to limit parcels
 where = "APN IN ('029-041-009', '016-091-020', '090-225-018')"
+
 #  make feature layer from parcel base
 parcelLayer = arcpy.management.MakeFeatureLayer("ParcelLayerProjected", "Parcel_Layer", where_clause=where)
 
@@ -39,7 +38,7 @@ def timer(func):
         return result
     return wrapper
 
-# create dictionary to post
+# create dictionary and post
 @timer
 def post_parcel_geom_update(featureLayer, url):
     # Use a SearchCursor to iterate through the features
@@ -49,6 +48,7 @@ def post_parcel_geom_update(featureLayer, url):
             total_count +=1
             if (total_count%1000)==0:
                 print(f"Updating row {total_count}")
+            # setup dictionary
             feature_dict = {
                 'APN': row[1],
                 'WKT': row[0]

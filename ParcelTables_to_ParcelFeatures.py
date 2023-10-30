@@ -30,6 +30,7 @@ from arcgis.features import FeatureSet, GeoAccessor, GeoSeriesAccessor
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from boxsdk import Client, CCGAuth
 
 # set overwrite to true
 arcpy.env.overwriteOutput = True

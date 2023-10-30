@@ -29,7 +29,7 @@ from arcgis.features import FeatureSet, GeoAccessor, GeoSeriesAccessor
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from boxsdk import OAuth2, Client
+from boxsdk import OAuth2, Client, CCGAuth
 
 # set overwrite to true
 arcpy.env.overwriteOutput = True
@@ -127,13 +127,20 @@ def updateSDE(inputfc,outfc, fieldnames, log):
 # EXTRACT DATA FROM BOX
 #---------------------------------------------------------------------------------------#
 # Box API credentials
-clientId        = 'pusxamhqx4urav2lj847darrr1niydzp'
-clientSecret    = 'tmnxqxp8sSY6i24OPX2bAYFrnIA3cerZ'
-accessToken     = '0H8G8Pq1Ze8OAimuuHUFixvrHVvOWyU2'
 
-# setup box connection
-oauth2 = OAuth2(clientId, clientSecret, access_token=accessToken)
-client = Client(oauth2)
+auth = CCGAuth(
+  client_id="pusxamhqx4urav2lj847darrr1niydzp",
+  client_secret="tmnxqxp8sSY6i24OPX2bAYFrnIA3cerZ",
+  user="21689880902"
+)
+client = Client(auth)
+
+# # setup box connection with oauth2
+# clientId        = 'pusxamhqx4urav2lj847darrr1niydzp'
+# clientSecret    = 'tmnxqxp8sSY6i24OPX2bAYFrnIA3cerZ'
+# accessToken     = '0H8G8Pq1Ze8OAimuuHUFixvrHVvOWyU2'
+# oauth2 = OAuth2(clientId, clientSecret, access_token=accessToken)
+# client = Client(oauth2)
 
 # grading exception BOX file id
 fileID = '1337039879890'
