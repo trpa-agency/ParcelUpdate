@@ -151,7 +151,6 @@ file = client.file(fileID).get()
 if file:
     # local file to overwrite
     local_file_path = "//trpa-fs01/GIS/Acella/Reports/Grading_Exception_Map.csv"
-
     # Download and save the file
     with open(local_file_path, 'wb') as local_file:
         file.download_to(local_file)
