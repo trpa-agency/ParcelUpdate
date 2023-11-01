@@ -97,7 +97,7 @@ fileToSend = log_file_path
 subject = "Parcel Tables to Parcel Features ETL"
 sender_email = "infosys@trpa.org"
 # password = ''
-receiver_email = "mbindl@trpa.gov"
+receiver_email = "GIS@trpa.gov"
 
 #---------------------------------------------------------------------------------------#
 ## FUNCTIONS ##
@@ -135,10 +135,11 @@ def updateStagingLayer(name, df, fields):
     # spaital dataframe to feature class
     dfOut.spatial.to_featureclass(outFC, sanitize_columns=False)
     # confirm feature class was created
-    print("\nUpdated staging layer: " + outFC)
+    print(f"\nUpdated staging layer:{outFC}")
+    logger.info(f"\nUpdated staging layer:{outFC}")
 
 # replaces features in outfc with exact same schema
-def updateSDECollectFC(fcList, sdeString, workspace, log):
+def updateSDECollectFC(fcList):
     for fc in fcList:
         inputFC = os.path.join(workspace, fc)
         dsc = arcpy.Describe(inputFC)
@@ -148,9 +149,9 @@ def updateSDECollectFC(fcList, sdeString, workspace, log):
         outfc = sdeString + fc
         # deletes all rows from the SDE feature class
         arcpy.TruncateTable_management(outfc)
-        log.info("\nDeleted all records in: {}\n".format(outfc))
+        logger.info("\nDeleted all records in: {}\n".format(outfc))
         from time import strftime  
-        log.info("Started data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
+        logger.info("Started data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
         # insert rows from Temporary feature class to SDE feature class
         with arcpy.da.InsertCursor(outfc, fieldnames) as oCursor:
             count = 0
@@ -159,49 +160,52 @@ def updateSDECollectFC(fcList, sdeString, workspace, log):
                     oCursor.insertRow(row)
                     count += 1
                     if count % 100 == 0:
-                        log.info("Inserting record %d into %s SDE feature class" % (count, outfc))
-                log.info("Finished data transfer")
-                log.info(f"\nDone updating: {outfc}")
+                        logger.info("Inserting record %d into %s SDE feature class" % (count, outfc))
+                logger.info(f"\nDone updating: {outfc}")
             
 # get box files
-def getAccelaBOXfiles(fileDict, outFolder, client, log):
+def getAccelaBOXfiles(fileDict):
     for fileName, fileID in fileDict.items():
         # Get the file object
         file = client.file(fileID).get()
         if file:
             # local file to overwrite
-            local_file_path = os.path.join(outFolder, fileName)
+            local_file_path = os.path.join(accelaFiles, fileName)
             # Download and save the file
             with open(local_file_path, 'wb') as local_file:
                 file.download_to(local_file)
-                log.info(f'File downloaded and saved as: {local_file_path}')
+                logger.info(f'File downloaded and saved as: {local_file_path}')
         else:
-            log.info(f'Error downloading file. File not found.')
+            logger.info(f'Error downloading file. File not found.')
 
 # get the bigger accela report data via the API ESA setup on LTinfo
-def getAccelaLTinfoFiles(csvDict, outFolder, log):
+def getAccelaLTinfoFiles(csvDict):
     for csvName,api_url in csvDict.items():
         # Send a GET request to the API
         response = requests.get(api_url)
         if response.status_code == 200:
             # If the request is successful, save the CSV content to a file
-            with open(os.path.join(outFolder,csvName), "wb") as csv_file:
+            with open(os.path.join(accelaFiles,csvName), "wb") as csv_file:
                 csv_file.write(response.content)
-            log.info(f"CSV file saved as {csvName}")
+            logger.info(f"CSV file saved as {csvName}")
         else:
-            log.info(f"Failed to fetch data from the API. Status code: {response.status_code}")
+            logger.info(f"Failed to fetch data from the API. Status code: {response.status_code}")
 
 #---------------------------------------------------------------------------------------#
 ## GET DATA
 #---------------------------------------------------------------------------------------#
+
 # start timer for the get data requests
 startTimer = datetime.datetime.now()
 
-# dictionary of acella reports from ltinfo (check with ESA for updates or issues to their API)
-ltinfoDict = {'Accela_Parcels.csv'         : 'https://qa.laketahoeinfo.org/Api/GetAccelaParcelsCsv/1A77D078-B83E-44E0-8CA5-8D7429E1A6B4',
-              'Accela_Record_Details.csv'  : 'https://qa.laketahoeinfo.org/Api/GetAccelaRecordDetailsCsv/1A77D078-B83E-44E0-8CA5-8D7429E1A6B4',
-              'Accela_Record_Documents.csv': 'https://qa.laketahoeinfo.org/Api/GetAccelaRecordDocumentsCsv/1A77D078-B83E-44E0-8CA5-8D7429E1A6B4'
-             }
+# # dictionary of acella reports from ltinfo (check with ESA for updates or issues to their API)
+# ltinfoDict = {'Accela_Parcels.csv'         : 'https://qa.laketahoeinfo.org/Api/GetAccelaParcelsCsv/1A77D078-B83E-44E0-8CA5-8D7429E1A6B4',
+#               'Accela_Record_Details.csv'  : 'https://qa.laketahoeinfo.org/Api/GetAccelaRecordDetailsCsv/1A77D078-B83E-44E0-8CA5-8D7429E1A6B4',
+#               'Accela_Record_Documents.csv': 'https://qa.laketahoeinfo.org/Api/GetAccelaRecordDocumentsCsv/1A77D078-B83E-44E0-8CA5-8D7429E1A6B4'
+#              }
+
+# # function to save Accela Reports from LTinfo API
+# getAccelaLTinfoFiles(ltinfoDict, accelaFiles, logger)
 
 # dictionary of csv name and box file ID
 boxDict = {'Land_Capable_Verifications.csv': "1342591986420",
@@ -212,10 +216,7 @@ boxDict = {'Land_Capable_Verifications.csv': "1342591986420",
            }
 
 # function to save Accela Reports from Box
-getAccelaBOXfiles(boxDict, accelaFiles, client, logger)
-
-# # function to save Accela Reports from LTinfo API
-# getAccelaLTinfoFiles(ltinfoDict, accelaFiles, logger)
+getAccelaBOXfiles(boxDict)
 
 # make dataframes from exported accela views
 dfLCV      = pd.read_csv(os.path.join(accelaFiles, 'Land_Capable_Verifications.csv'))
@@ -228,7 +229,7 @@ dfGrade    = pd.read_csv(os.path.join(accelaFiles, 'Grading_Exception_Map.csv'))
 # dfAPermit  = pd.read_csv(os.path.join(accelaFiles, 'Accela_Record_Details.csv'),   on_bad_lines='skip')
 # dfADoc     = pd.read_csv(os.path.join(accelaFiles, 'Accela_Record_Documents.csv'), on_bad_lines='skip')
 
-# get BMP Status data as dataframe BMP SQL Database
+# get BMP Status data as dataframe from BMP SQL Database
 with engine.begin() as bmpConnect:
     dfBMP      = pd.read_sql("SELECT * FROM tahoebmpsde.dbo.v_BMPStatus", bmpConnect)
 
@@ -240,7 +241,7 @@ dfDRBank   = pd.read_json("https://laketahoeinfo.org/WebServices/GetBankedDevelo
 dfDRTrans  = pd.read_json("https://laketahoeinfo.org/WebServices/GetTransactedAndBankedDevelopmentRights/JSON/e17aeb86-85e3-4260-83fd-a2b32501c476")
 dfDeed     = pd.read_json("https://laketahoeinfo.org/WebServices/GetDeedRestrictedParcels/JSON/e17aeb86-85e3-4260-83fd-a2b32501c476")
 
-# create spatial dataframe from parcel master in sde
+# create spatial dataframe from parcel master SDE
 parcels = sdeBase + "\\sde.SDE.Parcels\\sde.SDE.Parcel_Master"
 sdfParcels = pd.DataFrame.spatial.from_featureclass(parcels)
        
@@ -248,6 +249,10 @@ sdfParcels = pd.DataFrame.spatial.from_featureclass(parcels)
 endTimer = datetime.datetime.now() - startTimer
 print("\nTime it took to get the data: {}".format(endTimer))   
 logger.info("\nTime it took to get the data: {}".format(endTimer)) 
+
+#---------------------------------------------------------------------------------------#
+## TRANSFORM TABLES INTO STAGING LAYERS
+#---------------------------------------------------------------------------------------#
 
 try:
     #---------------------------------------------------------------------------------------#
@@ -396,7 +401,7 @@ try:
                 'End_Date',
                 'Description',
                 "SHAPE"]].copy()
-                
+
 ### The report fields changed so we renamed to match the feature class
     dfOut.rename(columns={
                 'APN':'apn',
@@ -674,60 +679,60 @@ try:
     print("\nTime it took to create staging layers: {}".format(endTimer))       
     #---------------------------------------------------------------------------------------#
 
-    # ##--------------------------------------------------------------------------------------------------------#
-    # ## BEGIN SDE UPDATES ##
-    # ##--------------------------------------------------------------------------------------------------------#
+    ##--------------------------------------------------------------------------------------------------------#
+    ## BEGIN SDE UPDATES ##
+    ##--------------------------------------------------------------------------------------------------------#
 
-    # # disconnect all users
-    # print("\nDisconnecting all users...")
-    # arcpy.DisconnectUser(sdeCollect, "ALL")
+    # disconnect all users
+    print("\nDisconnecting all users...")
+    arcpy.DisconnectUser(sdeCollect, "ALL")
 
-    # # unregister the sde feature class as versioned
-    # print ("\nUnregistering feature dataset as versioned...")
-    # arcpy.UnregisterAsVersioned_management(fdata,"NO_KEEP_EDIT","COMPRESS_DEFAULT")
-    # print ("\nFinished unregistering feature dataset as versioned.")
-
-    # # #---------------------------------------------------------------------------------------#
-
-    # # feature class list
-    # fcs =["Parcel_BMP",
-    #       "Parcel_Accela_LandCapabilityVerification",
-    #       "Parcel_Accela_LCV_Challenge",
-    #       "Parcel_Accela_SoilsHydro",
-    #       "Parcel_Accela_Historic",
-    #       "Parcel_Accela_GradingExceptions",
-    #       "Parcel_LTinfo",
-    #       "Parcel_LTinfo_IPES",
-    #       "Parcel_LTinfo_LCV",
-    #       "Parcel_LTinfo_DevelopmentRight_Banked",
-    #       "Parcel_LTinfo_DevelopmentRight_Transacted_Banked",
-    #       "Parcel_LTinfo_DeedRestriction"
-    #       ]
-
-    # # function to update all collection SDE feature classes in list
-    # updateSDECollectFC(fcs, sdeString, workspace, logger)
+    # unregister the sde feature class as versioned
+    print ("\nUnregistering feature dataset as versioned...")
+    arcpy.UnregisterAsVersioned_management(fdata,"NO_KEEP_EDIT","COMPRESS_DEFAULT")
+    print ("\nFinished unregistering feature dataset as versioned.")
 
     # #---------------------------------------------------------------------------------------#
-    # # report how long it took to get the data
-    # endTimer = datetime.datetime.now() - startTimer 
-    # logger.info(f"\nTime it took to update Collection SDE feature classes: {endTimer}") 
-    # #---------------------------------------------------------------------------------------#
 
-    # ##--------------------------------------------------------------------------------------------------------#
-    # ## END OF UPDATES ##
-    # ##--------------------------------------------------------------------------------------------------------#
+    # feature class list
+    fcs =["Parcel_BMP",
+          "Parcel_Accela_LandCapabilityVerification",
+          "Parcel_Accela_LCV_Challenge",
+          "Parcel_Accela_SoilsHydro",
+          "Parcel_Accela_Historic",
+          "Parcel_Accela_GradingExceptions",
+          "Parcel_LTinfo",
+          "Parcel_LTinfo_IPES",
+          "Parcel_LTinfo_LCV",
+          "Parcel_LTinfo_DevelopmentRight_Banked",
+          "Parcel_LTinfo_DevelopmentRight_Transacted_Banked",
+          "Parcel_LTinfo_DeedRestriction"
+          ]
 
-    # # disconnect all users
-    # print("\nDisconnecting all users...")
-    # logger.info("\nDisconnecting all users...")
-    # arcpy.DisconnectUser(sdeCollect, "ALL")
+    # function to update all collection SDE feature classes in list
+    updateSDECollectFC(fcs)
 
-    # print("\nRegistering feature dataset as versioned...")
-    # logger.info("\nRegistering feature dataset as versioned...")
-    # # register SDE feature class as versioned
-    # arcpy.RegisterAsVersioned_management(fdata, "NO_EDITS_TO_BASE")
-    # print("\nFinished registering feature dataset as versioned.")
-    # logger.info("\nFinished registering feature dataset as versioned.")
+    #---------------------------------------------------------------------------------------#
+    # report how long it took to get the data
+    endTimer = datetime.datetime.now() - startTimer 
+    logger.info(f"\nTime it took to update Collection SDE feature classes: {endTimer}") 
+    #---------------------------------------------------------------------------------------#
+
+    ##--------------------------------------------------------------------------------------------------------#
+    ## END OF UPDATES ##
+    ##--------------------------------------------------------------------------------------------------------#
+
+    # disconnect all users
+    print("\nDisconnecting all users...")
+    logger.info("\nDisconnecting all users...")
+    arcpy.DisconnectUser(sdeCollect, "ALL")
+
+    print("\nRegistering feature dataset as versioned...")
+    logger.info("\nRegistering feature dataset as versioned...")
+    # register SDE feature class as versioned
+    arcpy.RegisterAsVersioned_management(fdata, "NO_EDITS_TO_BASE")
+    print("\nFinished registering feature dataset as versioned.")
+    logger.info("\nFinished registering feature dataset as versioned.")
     # report how long it took to run the script
     runTime = datetime.datetime.now() - startTimer
     logger.info(f"\nTime it took to run this script: {runTime}")
