@@ -127,25 +127,15 @@ def send_mail(body):
         logger.error(e)
 
 # # update staging layers
-# def updateStagingLayers(layers):
-#     for layer in layers:
-        #     ## Create feature class of LT Info parcels
-        # # name of feature class
-        # name = "Parcel_LTinfo"
-        # # specify output feature class
-        # outFC = os.path.join(workspace, name)
-
-        # # create spatial data frame by merging parcels and sql table on APN
-        # df = pd.merge(sdfParcels, dfLTAPN, on='APN', how='inner')
-        # # create fields list
-        # fields = list(df.columns)[0:2]+[list(df.columns)[20]]+list(df.columns)[75:]+[list(df.columns)[74]]
-        
-        # # specify fields to keep
-        # dfOut = df[fields].copy()
-        # # spaital dataframe to feature class
-        # dfOut.spatial.to_featureclass(outFC, sanitize_columns=False)
-        # # confirm feature class was created
-        # print("\nUpdated staging layer: " + outFC)
+def updateStagingLayer(name, df, fields):
+    # copy fields to keep
+    dfOut = df[fields].copy()
+    # specify output feature class
+    outFC = os.path.join(workspace, name)
+    # spaital dataframe to feature class
+    dfOut.spatial.to_featureclass(outFC, sanitize_columns=False)
+    # confirm feature class was created
+    print("\nUpdated staging layer: " + outFC)
 
 # replaces features in outfc with exact same schema
 def updateSDECollectFC(fcList, sdeString, workspace, log):
@@ -270,96 +260,122 @@ try:
     # Create BMP feature class
     # name of feature class
     name = "Parcel_BMP"
-    # specify output feature class
-    outFC = os.path.join(workspace, name)
+
     # create spatial data frame by merging parcels and sql table on APN
     df = pd.merge(sdfParcels, dfBMP, on='APN', how='inner')
-    # specify fields to keep
-    fields = list(df.columns)[:3]+list(df.columns)[76:]+[list(df.columns)[74]]
-    # specify fields to keep
-    dfOut = df[fields].copy()
-    # rename some of the fields
-    dfOut.rename(columns={"PPNO_x": "PPNO"}, inplace=True)
-    # spaital dataframe to feature class
-    dfOut.spatial.to_featureclass(outFC, sanitize_columns=False)
-    # confirm feature class was created
-    print("\nUpdated staging layer: " + outFC)
     
+    # specify fields to keep
+    fields = ['APN',
+            'OWN_FULL',
+            'MAIL_ADD1',
+            'MAIL_ADD2',
+            'MAIL_CITY',
+            'MAIL_STATE',
+            'MAIL_ZIP5',
+            'JURISDICTION',
+            'OWNERSHIP_TYPE',
+            'EXISTING_LANDUSE',
+            'CertificateIssued',
+            'EvaluationComplete',
+            'SourceCertIssued',
+            'CertDate',
+            'CertReissuedDate',
+            'LandUse',
+            'BMPStatus',
+            'Catchment',
+            'SourceCertDate',
+            'SiteConstraint',
+            'ParcelStreet',
+            'CreditPercent',
+            'AreaWide',
+            'CreditArea',
+            'Rvkd',
+            'TMDL_LandUse',
+            'OwnerName',
+            'SourceCertReissuedDate',
+            'SourceCertNo',
+            'CertNo',
+            'SHAPE']
+
+    # update staging feature class from dataframe
+    updateStagingLayer(name, df, fields)
+
     #---------------------------------------------------------------------------------------#
 
     ## Create feature class of Land Capability Verifications
     # name of feature class
-    name = "Parcel_Accela_LCV"
-    # specify output feature class
-    outFC = os.path.join(workspace, name)
+    name = "Parcel_Accela_LandCapabilityVerification"
+
     # create spatial data frame by merging parcels and sql table on APN
     df = pd.merge(sdfParcels, dfLCV, left_on='APN', right_on='GIS_ID', how='inner')
     # rename some of the fields
     df.rename(columns={"LABEL_FIELD": "Status"}, inplace=True)
+    
     # specify fields to keep
-    dfOut = df[["OBJECTID","APN", "Status", "SHAPE"]].copy()
-    # spaital dataframe to feature class
-    dfOut.spatial.to_featureclass(outFC)
-    # confirm feature class was created
-    print("\nUpdated staging layer: " + outFC)
+    fields = ["APN", 
+            "Status", 
+            "SHAPE"]
+
+    # update staging feature class from dataframe
+    updateStagingLayer(name, df, fields)
 
     # -----------------------------------------------------------------------------------#
 
     ## Create feature class of LCV Challenges
     # name of feature class
     name = "Parcel_Accela_LCV_Challenge"
-    # specify output feature class
-    outFC = os.path.join(workspace, name)
+
     # create spatial data frame by merging parcels and sql table on APN
     df = pd.merge(sdfParcels, dfLCC, left_on='APN', right_on='GIS_ID', how='inner')
     # rename some of the fields
     df.rename(columns={"REC_DATE": "Date", "LABEL_FIELD": "Status"}, inplace=True)
+    
     # specify fields to keep
-    dfOut = df[["APN", "Date", "Status", "SHAPE"]].copy()
-    # spaital dataframe to feature class
-    dfOut.spatial.to_featureclass(outFC)
-    # confirm feature class was created
-    print("\nUpdated staging layer: " + outFC)
+    fields = ["APN", 
+            "Date", 
+            "Status", 
+            "SHAPE"]
+
+    # update staging feature class from dataframe
+    updateStagingLayer(name, df, fields)
 
     # -------------------------------------------------------------------------------------#
 
     ## Create feature class of SOILS/Hydro Project
     # name of feature class
     name = "Parcel_Accela_SoilsHydro"
-    # specify output feature class
-    outFC = os.path.join(workspace, name)
 
     # create spatial data frame by merging parcels and sql table on APN
     df = pd.merge(sdfParcels, dfSoil, left_on='APN', right_on='GIS_ID', how='inner')
     # rename some of the fields
     df.rename(columns={"LABEL_FIELD": "Status"}, inplace=True)
-    # specify fields to keep
-    dfOut = df[["APN","Status", "SHAPE"]].copy()
     
-    # spaital dataframe to feature class
-    dfOut.spatial.to_featureclass(outFC)
-    # confirm feature class was created
-    print("\nUpdated staging layer: " + outFC)
+    # specify fields to keep
+    fields = ["APN",
+            "Status", 
+            "SHAPE"]
+
+    # update staging feature class from dataframe
+    updateStagingLayer(name, df, fields)
 
     ##--------------------------------------------------------------------------------------#
 
     ## Create feature class of historic designations
     # name of feature class
     name = "Parcel_Accela_Historic"
-    # specify output feature class
-    outFC = os.path.join(workspace, name)
 
     # create spatial data frame by merging parcels and sql table on APN
     df = pd.merge(sdfParcels, dfHist, left_on='APN', right_on='GIS_ID', how='inner')
     # rename some of the fields
     df.rename(columns={"REC_DATE": "Date", "LABEL_FIELD": "Status"}, inplace=True)
-    # specify fields to keep
-    dfOut = df[["APN", "Date", "Status", "SHAPE"]].copy()
+    
+    fields = ['APN',
+            'Status',
+            'Date',
+            'SHAPE']
 
-    # spaital dataframe to feature class
-    dfOut.spatial.to_featureclass(outFC)
-    # confirm feature class was created
-    print("\nUpdated staging layer: " + outFC)
+    # update staging feature class from dataframe
+    updateStagingLayer(name, df, fields)
 
     #---------------------------------------------------------------------------------------#
 
@@ -370,10 +386,8 @@ try:
     outFC = os.path.join(workspace, name)
     # create spatial data frame by merging parcels and sql table on APN
     df = pd.merge(sdfParcels, dfGrade, left_on='APN', right_on='PARCEL_NUMBER', how='left')
-
     #drop null parcels that dont have joined attributes
     df = df.dropna(subset=["PARCEL_NUMBER"])
-
     # # specify fields to keep
     dfOut = df[["APN", 
                 "APO_ADDRESS", 
@@ -382,16 +396,19 @@ try:
                 'End_Date',
                 'Description',
                 "SHAPE"]].copy()
-
-    dfOut = dfOut.rename(columns={'APN':'apn',
-                                'APO_ADDRESS':'property_address',
-                                'End_Date':'approved_ending_date',
-                                'Start_Date':'approved_beginning_date',
-                                'B1_ALT_ID':'file_number',
-                                'Description':'comment'})
+                
+### The report fields changed so we renamed to match the feature class
+    dfOut.rename(columns={
+                'APN':'apn',
+                'APO_ADDRESS':'property_address',
+                'End_Date':'approved_ending_date',
+                'Start_Date':'approved_beginning_date',
+                'B1_ALT_ID':'file_number',
+                'Description':'comment'}, 
+                inplace=True)
 
     # spaital dataframe to feature class
-    dfOut.spatial.to_featureclass(outFC)
+    dfOut.spatial.to_featureclass(outFC, sanitize_columns=False)
     # confirm feature class was created
     print("\nUpdated staging layer: " + outFC)
 
@@ -400,177 +417,317 @@ try:
     ## Create feature class of LT Info parcels
     # name of feature class
     name = "Parcel_LTinfo"
-    # specify output feature class
-    outFC = os.path.join(workspace, name)
 
     # create spatial data frame by merging parcels and sql table on APN
     df = pd.merge(sdfParcels, dfLTAPN, on='APN', how='inner')
-    # create fields list
-    fields = list(df.columns)[0:2]+[list(df.columns)[20]]+list(df.columns)[75:]+[list(df.columns)[74]]
     
-    # specify fields to keep
-    dfOut = df[fields].copy()
-    # spaital dataframe to feature class
-    dfOut.spatial.to_featureclass(outFC, sanitize_columns=False)
-    # confirm feature class was created
-    print("\nUpdated staging layer: " + outFC)
+    # create fields list
+    fields = ['APN',
+            'OWN_FULL',
+            'MAIL_ADD1',
+            'MAIL_ADD2',
+            'MAIL_CITY',
+            'MAIL_STATE',
+            'MAIL_ZIP5',
+            'JURISDICTION',
+            'OWNERSHIP_TYPE',
+            'EXISTING_LANDUSE',
+            'ParcelNickname',
+            'ParcelSize',
+            'Status',
+            'RetiredFromDevelopment',
+            'IsAutoImported',
+            'OwnerName',
+            'ParcelAddress',
+            'Jurisdiction',
+            'ParcelNotes',
+            'LocalPlan',
+            'FireDistrict',
+            'ParcelWatershed',
+            'BMPStatus',
+            'HRA',
+            'HasMooringRegistration',
+            'SFRUU',
+            'RBU',
+            'TAU',
+            'CFA',
+            'RFA',
+            'TFA',
+            'PRUU',
+            'MFRUU',
+            'SHAPE']
+
+    # update staging feature class from dataframe
+    updateStagingLayer(name, df, fields)
 
     #---------------------------------------------------------------------------------------#
 
     ## Create feature class of LT Info parcels
     # name of feature class
     name = "Parcel_LTinfo_IPES"
-    # specify output feature class
-    outFC = os.path.join(workspace, name)
 
     # create spatial data frame by merging parcels and sql table on APN
     df = pd.merge(sdfParcels, dfIPES, on='APN', how='inner')
-    # create fields list
-    fields = list(df.columns)[0:2]+[list(df.columns)[20]]+list(df.columns)[75:]+[list(df.columns)[74]]
     
-    # specify fields to keep
-    dfOut = df[fields].copy()
-    # spaital dataframe to feature class
-    dfOut.spatial.to_featureclass(outFC, sanitize_columns=False)
-    # confirm feature class was created
-    print("\nUpdated staging layer: " + outFC)
+    # create fields list
+    fields = ['APN',
+            'OWN_FULL',
+            'MAIL_ADD1',
+            'MAIL_ADD2',
+            'MAIL_CITY',
+            'MAIL_STATE',
+            'MAIL_ZIP5',
+            'JURISDICTION',
+            'OWNERSHIP_TYPE',
+            'EXISTING_LANDUSE',
+            'ScoreSheetUrl',
+            'Status',
+            'ParcelNickname',
+            'IPESScore',
+            'IPESScoreType',
+            'BaseAllowableCoveragePercent',
+            'IPESTotalAllowableCoverageSqFt',
+            'ParcelHasDOAC',
+            'HistoricOrImportedIpesScore',
+            'CalculationDate',
+            'FieldEvaluationDate',
+            'RelativeErosionHazardScore',
+            'RunoffPotentialScore',
+            'AccessScore',
+            'UtilityInSEZScore',
+            'ConditionOfWatershedScore',
+            'AbilityToRevegetateScore',
+            'WaterQualityImprovementsScore',
+            'ProximityToLakeScore',
+            'LimitedIncentivePoints',
+            'TotalParcelArea',
+            'IPESBuildingSiteArea',
+            'SEZLandArea',
+            'SEZSetbackArea',
+            'InternalNotes',
+            'PublicNotes',
+            'SHAPE']
+    
+    # update staging feature class from dataframe
+    updateStagingLayer(name, df, fields)
 
     #---------------------------------------------------------------------------------------#
 
-    ## Create feature class of LT Info LCV parcels
     # name of feature class
     name = "Parcel_LTinfo_LCV"
-    # specify output feature class
-    outFC = os.path.join(workspace, name)
-    
     # create spatial data frame by merging parcels and sql table on APN
     df = pd.merge(sdfParcels, dfLCVinfo, on='APN', how='inner')
-    # specify fields to keep
-    fields = list(df.columns)[0:2]+list(df.columns)[76:]+[list(df.columns)[74]]
     
     # specify fields to keep
-    dfOut = df[fields].copy()
-    # spaital dataframe to feature class
-    dfOut.spatial.to_featureclass(outFC, sanitize_columns=False)
-    # confirm feature class was created
-    print("\nUpdated staging layer: " + outFC)
+    fields = ['APN',
+            'OWN_FULL',
+            'MAIL_ADD1',
+            'MAIL_ADD2',
+            'MAIL_CITY',
+            'MAIL_STATE',
+            'MAIL_ZIP5',
+            'JURISDICTION',
+            'OWNERSHIP_TYPE',
+            'EXISTING_LANDUSE',
+            'Status',
+            'ParcelNickname',
+            'TotalAreaSqFt',
+            'UpdatedBy',
+            'UpdatedOn',
+            'DeterminationDate',
+            'EstimatedOrVerified',
+            'SitePlanUrl',
+            'AccelaCAPRecord',
+            'Bailey1aPresent',
+            'Bailey1aSqFt',
+            'Bailey1bPresent',
+            'Bailey1bSqFt',
+            'Bailey1cPresent',
+            'Bailey1cSqFt',
+            'Bailey2Present',
+            'Bailey2SqFt',
+            'Bailey3Present',
+            'Bailey3SqFt',
+            'Bailey4Present',
+            'Bailey4SqFt',
+            'Bailey5Present',
+            'Bailey5SqFt',
+            'Bailey6Present',
+            'Bailey6SqFt',
+            'Bailey7Present',
+            'Bailey7SqFt',
+            'IPESPresent',
+            'IPESSqFt',
+            'SHAPE']
+
+    # update staging feature class from dataframe
+    updateStagingLayer(name, df, fields)
 
     #---------------------------------------------------------------------------------------#
-
-    # name of feature class
+    
+    # feature class to update
     name = "Parcel_LTinfo_DevelopmentRight_Banked"
-    # specify output feature class
-    outFC = os.path.join(workspace, name)
-
+    
     # create spatial data frame by merging parcels and sql table on APN
     df = pd.merge(sdfParcels, dfDRBank, on='APN', how='inner')
+
     # specify fields to keep
-    fields = list(df.columns)[0:2]+list(df.columns)[75:]+[list(df.columns)[74]]
-    
-    # specify fields to keep
-    dfOut = df[fields].copy()
-    # spaital dataframe to feature class
-    dfOut.spatial.to_featureclass(outFC, sanitize_columns=False)
-    # confirm feature class was created
-    print("\nUpdated staging layer: " + outFC)
+    fields = ['APN',
+            'OWN_FULL',
+            'MAIL_ADD1',
+            'MAIL_ADD2',
+            'MAIL_CITY',
+            'MAIL_STATE',
+            'MAIL_ZIP5',
+            'JURISDICTION',
+            'OWNERSHIP_TYPE',
+            'EXISTING_LANDUSE',
+            'DevelopmentRight',
+            'LandCapability',
+            'IPESScore',
+            'CumulativeBankedQuantity',
+            'RemainingBankedQuantity',
+            'Jurisdiction',
+            'LocalPlan',
+            'DateBankedOrApproved',
+            'HRA',
+            'LastUpdated',
+            'SHAPE'] 
+
+    # update staging feature class from dataframe
+    updateStagingLayer(name, df, fields)
 
     #---------------------------------------------------------------------------------------#
-
-    # name of feature class
+    # feature class to update
     name = "Parcel_LTinfo_DevelopmentRight_Transacted_Banked"
-    # specify output feature class
-    outFC = os.path.join(workspace, name)
 
     # create spatial data frame by merging parcels and sql table on APN
     df = pd.merge(sdfParcels, dfDRTrans, on='APN', how='left')
+    
     # specify fields to keep
-    fields = list(df.columns)[0:2]+list(df.columns)[75:]+[list(df.columns)[74]]
-   
-    # specify fields to keep
-    dfOut = df[fields].copy()
-    # spaital dataframe to feature class
-    dfOut.spatial.to_featureclass(outFC, sanitize_columns=False)
-    # confirm feature class was created
-    print("\nUpdated staging layer: " + outFC)
+    fields = ['APN',
+            'APO_ADDRESS',
+            'OWN_FULL',
+            'MAIL_ADD1',
+            'MAIL_ADD2',
+            'MAIL_CITY',
+            'MAIL_STATE',
+            'MAIL_ZIP5',
+            'JURISDICTION',
+            'OWNERSHIP_TYPE',
+            'EXISTING_LANDUSE',
+            'RecordType',
+            'DevelopmentRight',
+            'LandCapability',
+            'IPESScore',
+            'CumulativeBankedQuantity',
+            'RemainingBankedQuantity',
+            'Jurisdiction',
+            'LocalPlan',
+            'DateBankedOrApproved',
+            'HRA',
+            'LastUpdated',
+            'TransactionNumber',
+            'TransactionApprovalDate',
+            'SendingParcel',
+            'ReceivingParcel',
+            'LandBank',
+            'SHAPE']
+
+    # update staging feature class from dataframe
+    updateStagingLayer(name, df, fields)
+    
     #---------------------------------------------------------------------------------------#
-    #---------------------------------------------------------------------------------------#
+    
     # name of feature class
     name = "Parcel_LTinfo_DeedRestriction"
-    # specify output feature class
-    outFC = os.path.join(workspace, name)
 
     # create spatial data frame by merging parcels and sql table on APN
     df = pd.merge(sdfParcels, dfDeed, on='APN', how='left')
-    # specify fields to keep
-    fields = list(df.columns)[0:6]+list(df.columns)[14:31]+['SHAPE']
-    
-    # specify fields to keep
-    dfOut = df[fields].copy()
-    # spaital dataframe to feature class
-    dfOut.spatial.to_featureclass(outFC, sanitize_columns=False)
-    # confirm feature class was created
-    print("\nUpdated staging layer: " + outFC)
 
+    # specify fields to keep
+    fields = ['APN',
+            'APO_ADDRESS',
+            'OWN_FULL',
+            'MAIL_ADD1',
+            'MAIL_ADD2',
+            'MAIL_CITY',
+            'MAIL_STATE',
+            'MAIL_ZIP5',
+            'JURISDICTION',
+            'OWNERSHIP_TYPE',
+            'EXISTING_LANDUSE',
+            'RecordingNumber',
+            'RecordingDate',
+            'Description',
+            'DeedRestrictionStatus',
+            'DeedRestrictionType',
+            'ProjectAreaFileNumber',
+            'SHAPE']
+            
+    # update staging feature class from dataframe
+    updateStagingLayer(name, df, fields)
+    
     #---------------------------------------------------------------------------------------#
     # report how long it took to get the data
     endTimer = datetime.datetime.now() - startTimer
     print("\nTime it took to create staging layers: {}".format(endTimer))       
     #---------------------------------------------------------------------------------------#
 
-    ##--------------------------------------------------------------------------------------------------------#
-    ## BEGIN SDE UPDATES ##
-    ##--------------------------------------------------------------------------------------------------------#
+    # ##--------------------------------------------------------------------------------------------------------#
+    # ## BEGIN SDE UPDATES ##
+    # ##--------------------------------------------------------------------------------------------------------#
 
-    # disconnect all users
-    print("\nDisconnecting all users...")
-    arcpy.DisconnectUser(sdeCollect, "ALL")
+    # # disconnect all users
+    # print("\nDisconnecting all users...")
+    # arcpy.DisconnectUser(sdeCollect, "ALL")
 
-    # unregister the sde feature class as versioned
-    print ("\nUnregistering feature dataset as versioned...")
-    arcpy.UnregisterAsVersioned_management(fdata,"NO_KEEP_EDIT","COMPRESS_DEFAULT")
-    print ("\nFinished unregistering feature dataset as versioned.")
+    # # unregister the sde feature class as versioned
+    # print ("\nUnregistering feature dataset as versioned...")
+    # arcpy.UnregisterAsVersioned_management(fdata,"NO_KEEP_EDIT","COMPRESS_DEFAULT")
+    # print ("\nFinished unregistering feature dataset as versioned.")
+
+    # # #---------------------------------------------------------------------------------------#
+
+    # # feature class list
+    # fcs =["Parcel_BMP",
+    #       "Parcel_Accela_LandCapabilityVerification",
+    #       "Parcel_Accela_LCV_Challenge",
+    #       "Parcel_Accela_SoilsHydro",
+    #       "Parcel_Accela_Historic",
+    #       "Parcel_Accela_GradingExceptions",
+    #       "Parcel_LTinfo",
+    #       "Parcel_LTinfo_IPES",
+    #       "Parcel_LTinfo_LCV",
+    #       "Parcel_LTinfo_DevelopmentRight_Banked",
+    #       "Parcel_LTinfo_DevelopmentRight_Transacted_Banked",
+    #       "Parcel_LTinfo_DeedRestriction"
+    #       ]
+
+    # # function to update all collection SDE feature classes in list
+    # updateSDECollectFC(fcs, sdeString, workspace, logger)
 
     # #---------------------------------------------------------------------------------------#
+    # # report how long it took to get the data
+    # endTimer = datetime.datetime.now() - startTimer 
+    # logger.info(f"\nTime it took to update Collection SDE feature classes: {endTimer}") 
+    # #---------------------------------------------------------------------------------------#
 
-    # feature class list
-    fcs =["Parcel_BMP",
-          "Parcel_Accela_LCV",
-          "Parcel_Accela_LCV_Challenge",
-          "Parcel_Accela_SoilsHydro",
-          "Parcel_Accela_Historic",
-          "Parcel_Accela_GradingExceptions",
-          "Parcel_LTinfo",
-          "Parcel_LTinfo_IPES",
-          "Parcel_LTinfo_LCV",
-          "Parcel_LTinfo_DevelopmentRight_Banked",
-          "Parcel_LTinfo_DevelopmentRight_Transacted_Banked",
-          "Parcel_LTinfo_DeedRestriction"
-          ]
+    # ##--------------------------------------------------------------------------------------------------------#
+    # ## END OF UPDATES ##
+    # ##--------------------------------------------------------------------------------------------------------#
 
-    # function to update all collection SDE feature classes in list
-    updateSDECollectFC(fcs, sdeString, workspace, logger)
+    # # disconnect all users
+    # print("\nDisconnecting all users...")
+    # logger.info("\nDisconnecting all users...")
+    # arcpy.DisconnectUser(sdeCollect, "ALL")
 
-    #---------------------------------------------------------------------------------------#
-    # report how long it took to get the data
-    endTimer = datetime.datetime.now() - startTimer 
-    logger.info(f"\nTime it took to update Collection SDE feature classes: {endTimer}") 
-    #---------------------------------------------------------------------------------------#
-
-    ##--------------------------------------------------------------------------------------------------------#
-    ## END OF UPDATES ##
-    ##--------------------------------------------------------------------------------------------------------#
-
-    # disconnect all users
-    print("\nDisconnecting all users...")
-    logger.info("\nDisconnecting all users...")
-    arcpy.DisconnectUser(sdeCollect, "ALL")
-
-    print("\nRegistering feature dataset as versioned...")
-    logger.info("\nRegistering feature dataset as versioned...")
-    # register SDE feature class as versioned
-    arcpy.RegisterAsVersioned_management(fdata, "NO_EDITS_TO_BASE")
-    print("\nFinished registering feature dataset as versioned.")
-    logger.info("\nFinished registering feature dataset as versioned.")
+    # print("\nRegistering feature dataset as versioned...")
+    # logger.info("\nRegistering feature dataset as versioned...")
+    # # register SDE feature class as versioned
+    # arcpy.RegisterAsVersioned_management(fdata, "NO_EDITS_TO_BASE")
+    # print("\nFinished registering feature dataset as versioned.")
+    # logger.info("\nFinished registering feature dataset as versioned.")
     # report how long it took to run the script
     runTime = datetime.datetime.now() - startTimer
     logger.info(f"\nTime it took to run this script: {runTime}")
