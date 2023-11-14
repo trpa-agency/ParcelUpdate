@@ -158,7 +158,8 @@ def updateSDECollectFC(fcList):
 startTimer = datetime.datetime.now()
 
 # get feature classes from enterprise geodatabase
-mfAllowed    = os.path.join(sdeBase, "")
+bonusBoundary= os.path.join(sdeBase, "sde.SDE.Planning\sde.SDE.Bonus_unit_boundary")
+mfAllowed    = os.path.join(sdeBase, "sde.SDE.Planning\sde.SDE.Multifamily_Allowed_Zone")
 parcelMaster = os.path.join(sdeBase, "sde.SDE.Parcels\\sde.SDE.Parcel_Master")
 parcelIPES   = os.path.join(sdeCollect, fdata, "sde_collection.SDE.Parcel_LTinfo_IPES")
 parcelDeed   = os.path.join(sdeCollect, fdata, "sde_collection.SDE.Parcel_LTinfo_DeedRestriction")
@@ -190,6 +191,8 @@ try:
     # name of feature class
     name = "Parcel_Development"
 
+    # spatial join
+
     # List of DataFrames
     dfs = [sdfParcels, sdfDeed, sdfIPES]
 
@@ -202,13 +205,6 @@ try:
     print(combined_df)
     # specify fields to keep
     fields = ['APN',
-            'APO_ADDRESS',
-            'OWN_FULL',
-            'MAIL_ADD1',
-            'MAIL_ADD2',
-            'MAIL_CITY',
-            'MAIL_STATE',
-            'MAIL_ZIP5',
             'JURISDICTION',
             'OWNERSHIP_TYPE',
             'EXISTING_LANDUSE',
