@@ -119,6 +119,7 @@ def fieldJoinCalc_multikey(updateFC, updateFieldsList_key, updateFieldsList_valu
                 edit_session.stopOperation()    
     del valueDict  
     print ("Finished data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
+    
 #     log.info("Finished data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
 #Gonna have to make this a compound key as well - need to handle duplicate APNs?
 @timer
@@ -397,7 +398,7 @@ arcpy.MakeFeatureLayer_management("//Trpa-fs01/GIS/PARCELUPDATE/Workspace/Parcel
 arcpy.CreateVersion_management(inWorkspace, parent_version, new_version_name, "PUBLIC")
 
 # prefixes to remove...these we keep or ignore
-prefix_remove = ('880','881','910','920')
+prefix_remove = ('880','881','910','920','500', '510', '520', '530', '560', '570', '580', '590', '600', '700','800','900')
 # parcel master old/new
 parcel_master_new_apn = old_new_parcels_list(parcelMaster, parcelNew, 'Yes', 
                                              prefix_remove,'New APN')
