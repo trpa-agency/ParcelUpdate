@@ -24,9 +24,6 @@ import sys
 import logging
 from datetime import datetime
 import pandas as pd
-# external connection packages
-import requests
-from boxsdk import Client, CCGAuth
 import sqlalchemy as sa
 from sqlalchemy.engine import URL
 from sqlalchemy import create_engine
@@ -86,7 +83,7 @@ fileToSend = log_file_path
 subject = "Parcel Development ETL"
 sender_email = "infosys@trpa.org"
 # password = ''
-receiver_email = "GIS@trpa.gov"
+receiver_email = "mbindl@trpa.gov"
 
 #---------------------------------------------------------------------------------------#
 ## FUNCTIONS ##
@@ -160,34 +157,27 @@ def updateSDECollectFC(fcList):
 # start timer for the get data requests
 startTimer = datetime.datetime.now()
 
-
-# make dataframes from exported accela views
-dfLCV      = pd.read_csv(os.path.join(accelaFiles, 'Land_Capable_Verifications.csv'))
-
-# get BMP Status data as dataframe from BMP SQL Database
-with engine.begin() as bmpConnect:
-    dfBMP      = pd.read_sql("SELECT * FROM tahoebmpsde.dbo.v_BMPStatus", bmpConnect)
-
-# LTInfo - create dataframes from JSON found here: https://laketahoeinfo.org/WebServices/List
-dfLTAPN    = pd.read_json("https://laketahoeinfo.org/WebServices/GetAllParcels/JSON/e17aeb86-85e3-4260-83fd-a2b32501c476")
-dfIPES     = pd.read_json("https://laketahoeinfo.org/WebServices/GetParcelIPESScores/JSON/e17aeb86-85e3-4260-83fd-a2b32501c476")
-dfLCVinfo  = pd.read_json("https://laketahoeinfo.org/WebServices/GetParcelsByLandCapability/JSON/e17aeb86-85e3-4260-83fd-a2b32501c476")
-dfDRBank   = pd.read_json("https://laketahoeinfo.org/WebServices/GetBankedDevelopmentRights/JSON/e17aeb86-85e3-4260-83fd-a2b32501c476")
-dfDRTrans  = pd.read_json("https://laketahoeinfo.org/WebServices/GetTransactedAndBankedDevelopmentRights/JSON/e17aeb86-85e3-4260-83fd-a2b32501c476")
-dfDeed     = pd.read_json("https://laketahoeinfo.org/WebServices/GetDeedRestrictedParcels/JSON/e17aeb86-85e3-4260-83fd-a2b32501c476")
+# get feature classes from enterprise geodatabase
+mfAllowed    = os.path.join(sdeBase, "")
+parcelMaster = os.path.join(sdeBase, "sde.SDE.Parcels\\sde.SDE.Parcel_Master")
+parcelIPES   = os.path.join(sdeCollect, fdata, "sde_collection.SDE.Parcel_LTinfo_IPES")
+parcelDeed   = os.path.join(sdeCollect, fdata, "sde_collection.SDE.Parcel_LTinfo_DeedRestriction")
 
 # create spatial dataframe from parcel master SDE
-parcels = sdeBase + "\\sde.SDE.Parcels\\sde.SDE.Parcel_Master"
-sdfParcels = pd.DataFrame.spatial.from_featureclass(parcels)
-       
+sdfParcels = pd.DataFrame.spatial.from_featureclass(parcelMaster)
+sdfIPES    = pd.DataFrame.spatial.from_featureclass(parcelIPES)
+sdfDeed    = pd.DataFrame.spatial.from_featureclass(parcelDeed)
+
 # report how long it took to get the data
 endTimer = datetime.datetime.now() - startTimer
 print("\nTime it took to get the data: {}".format(endTimer))   
 logger.info("\nTime it took to get the data: {}".format(endTimer)) 
 
+
 #---------------------------------------------------------------------------------------#
-## TRANSFORM TABLES INTO STAGING LAYERS
+## TRANSFORM TO STAGING LAYERS
 #---------------------------------------------------------------------------------------#
+# join IPES, join Deed, MF Allowed Spatial Join, field calc of % allowed
 
 try:
     #---------------------------------------------------------------------------------------#
@@ -200,9 +190,16 @@ try:
     # name of feature class
     name = "Parcel_Development"
 
-    # create spatial data frame by merging parcels and sql table on APN
-    df = pd.merge(sdfParcels, dfDeed, on='APN', how='left')
+    # List of DataFrames
+    dfs = [sdfParcels, sdfDeed, sdfIPES]
 
+    # Merge DataFrames horizontally
+    combined_df = pd.merge(dfs[0], dfs[1], on='APN')
+    for df in dfs[2:]:
+        combined_df = pd.merge(combined_df, df, on='APN')
+
+    # Print the combined DataFrame
+    print(combined_df)
     # specify fields to keep
     fields = ['APN',
             'APO_ADDRESS',
@@ -215,16 +212,44 @@ try:
             'JURISDICTION',
             'OWNERSHIP_TYPE',
             'EXISTING_LANDUSE',
+            'ESTIMATED_COVERAGE_ALLOWED',
+            'PARCEL_SQFT',
             'RecordingNumber',
             'RecordingDate',
             'Description',
             'DeedRestrictionStatus',
             'DeedRestrictionType',
             'ProjectAreaFileNumber',
+            'ScoreSheetUrl',
+            'Status',
+            'ParcelNickname',
+            'IPESScore',
+            'IPESScoreType',
+            'BaseAllowableCoveragePercent',
+            'IPESTotalAllowableCoverageSqFt',
+            'ParcelHasDOAC',
+            'HistoricOrImportedIpesScore',
+            'CalculationDate',
+            'FieldEvaluationDate',
+            'RelativeErosionHazardScore',
+            'RunoffPotentialScore',
+            'AccessScore',
+            'UtilityInSEZScore',
+            'ConditionOfWatershedScore',
+            'AbilityToRevegetateScore',
+            'WaterQualityImprovementsScore',
+            'ProximityToLakeScore',
+            'LimitedIncentivePoints',
+            'TotalParcelArea',
+            'IPESBuildingSiteArea',
+            'SEZLandArea',
+            'SEZSetbackArea',
+            'InternalNotes',
+            'PublicNotes',
             'SHAPE']
             
     # update staging feature class from dataframe
-    updateStagingLayer(name, df, fields)
+    updateStagingLayer(name, combined_df, fields)
     
     #---------------------------------------------------------------------------------------#
     # report how long it took to get the data
@@ -236,44 +261,45 @@ try:
     ## BEGIN SDE UPDATES ##
     ##--------------------------------------------------------------------------------------------------------#
 
-    # disconnect all users
-    print("\nDisconnecting all users...")
-    arcpy.DisconnectUser(sdeCollect, "ALL")
+#     # disconnect all users
+#     print("\nDisconnecting all users...")
+#     arcpy.DisconnectUser(sdeCollect, "ALL")
 
-    # unregister the sde feature class as versioned
-    print ("\nUnregistering feature dataset as versioned...")
-    arcpy.UnregisterAsVersioned_management(fdata,"NO_KEEP_EDIT","COMPRESS_DEFAULT")
-    print ("\nFinished unregistering feature dataset as versioned.")
+#     # unregister the sde feature class as versioned
+#     print ("\nUnregistering feature dataset as versioned...")
+#     arcpy.UnregisterAsVersioned_management(fdata,"NO_KEEP_EDIT","COMPRESS_DEFAULT")
+#     print ("\nFinished unregistering feature dataset as versioned.")
 
-    # #---------------------------------------------------------------------------------------#
+#     # #---------------------------------------------------------------------------------------#
 
-    # feature class list
-    fcs =["Parcel_Development"]
+#     # feature class list
+#     fcs =["Parcel_Development"]
 
-    # function to update all collection SDE feature classes in list
-    updateSDECollectFC(fcs)
+#     # function to update all collection SDE feature classes in list
+#     updateSDECollectFC(fcs)
 
-    #---------------------------------------------------------------------------------------#
-    # report how long it took to get the data
-    endTimer = datetime.datetime.now() - startTimer 
-    logger.info(f"\nTime it took to update Collection SDE feature classes: {endTimer}") 
-    #---------------------------------------------------------------------------------------#
+#     #---------------------------------------------------------------------------------------#
+#     # report how long it took to get the data
+#     endTimer = datetime.datetime.now() - startTimer 
+#     logger.info(f"\nTime it took to update Collection SDE feature classes: {endTimer}") 
+#     #---------------------------------------------------------------------------------------#
 
-    ##--------------------------------------------------------------------------------------------------------#
-    ## END OF UPDATES ##
-    ##--------------------------------------------------------------------------------------------------------#
+#     ##--------------------------------------------------------------------------------------------------------#
+#     ## END OF UPDATES ##
+#     ##--------------------------------------------------------------------------------------------------------#
 
-    # disconnect all users
-    print("\nDisconnecting all users...")
-    logger.info("\nDisconnecting all users...")
-    arcpy.DisconnectUser(sdeCollect, "ALL")
+#     # disconnect all users
+#     print("\nDisconnecting all users...")
+#     logger.info("\nDisconnecting all users...")
+#     arcpy.DisconnectUser(sdeCollect, "ALL")
 
-    print("\nRegistering feature dataset as versioned...")
-    logger.info("\nRegistering feature dataset as versioned...")
-    # register SDE feature class as versioned
-    arcpy.RegisterAsVersioned_management(fdata, "NO_EDITS_TO_BASE")
-    print("\nFinished registering feature dataset as versioned.")
-    logger.info("\nFinished registering feature dataset as versioned.")
+#     print("\nRegistering feature dataset as versioned...")
+#     logger.info("\nRegistering feature dataset as versioned...")
+#     # register SDE feature class as versioned
+#     arcpy.RegisterAsVersioned_management(fdata, "NO_EDITS_TO_BASE")
+#     print("\nFinished registering feature dataset as versioned.")
+#     logger.info("\nFinished registering feature dataset as versioned.")
+    
     # report how long it took to run the script
     runTime = datetime.datetime.now() - startTimer
     logger.info(f"\nTime it took to run this script: {runTime}")
