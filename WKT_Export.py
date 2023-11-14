@@ -24,8 +24,10 @@ arcpy.Project_management(parcelBase, parcelLayerProjected, outCS)
 # where clause to limit parcels
 where = "APN IN ('029-041-009', '016-091-020', '090-225-018')"
 
-#  make feature layer from parcel base
-parcelLayer = arcpy.management.MakeFeatureLayer("ParcelLayerProjected", "Parcel_Layer", where_clause=where)
+# #  make feature layer from parcel base
+# parcelLayer = arcpy.management.MakeFeatureLayer("ParcelLayerProjected", "Parcel_Layer", where_clause=where)
+
+parcelLayer = arcpy.management.MakeFeatureLayer("ParcelLayerProjected", "Parcel_Layer")
 
 # time a function function
 ## use as decorator @timer
@@ -57,5 +59,5 @@ def post_parcel_geom_update(featureLayer, url):
             requests.post(url, feature_dict)
 
 # post geometries
-post_url = 'https://qa.laketahoeinfo.org/api/UpdateParcelGeometry/1A77D078-B83E-44E0-8CA5-8D7429E1A6B4'
+post_url = 'https://laketahoeinfo.org/api/UpdateParcelGeometry/1A77D078-B83E-44E0-8CA5-8D7429E1A6B4'
 post_parcel_geom_update(parcelLayer, post_url)
