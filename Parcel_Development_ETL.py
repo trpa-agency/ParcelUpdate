@@ -194,31 +194,61 @@ try:
     # spatial join
 
     # List of DataFrames
-    dfs = [sdfParcels, sdfDeed, sdfIPES]
+    dfs = [sdfParcels, sdfIPES]
 
-    # Merge DataFrames horizontally
-    combined_df = pd.merge(dfs[0], dfs[1], on='APN')
-    for df in dfs[2:]:
-        combined_df = pd.merge(combined_df, df, on='APN')
-
+    # # Merge DataFrames horizontally
+    # combined_df = pd.merge(dfs[0], dfs[1], on='APN')
+    # for df in dfs[2:]:
+    #     combined_df = pd.merge(combined_df, df, on='APN')
+    df = pd.merge(sdfParcels, sdfIPES, on='APN', how='left')
+       # rename some of the fields
+    df.rename(columns={"JURISDICTION_x": "JURISDICTION",
+                        "OWNERSHIP_TYPE_x":'OWNERSHIP_TYPE',
+                        "EXISTING_LANDUSE_x":"EXISTING_LANDUSE",
+                        "SHAPE_x":"SHAPE"
+                            }, inplace=True)
+    df['MF_ALLOWED'] = "No"
+    df['PERCENT_COVERAGE_ALLOWED'] = (df.ESTIMATED_COVERAGE_ALLOWED/df.PARCEL_SQFT)*100
     # Print the combined DataFrame
-    print(combined_df)
     # specify fields to keep
     fields = ['APN',
-            'JURISDICTION',
-            'OWNERSHIP_TYPE',
-            'EXISTING_LANDUSE',
-            'ESTIMATED_COVERAGE_ALLOWED',
-            'PARCEL_SQFT',
-            'RecordingNumber',
-            'RecordingDate',
-            'Description',
-            'DeedRestrictionStatus',
-            'DeedRestrictionType',
-            'ProjectAreaFileNumber',
-            'ScoreSheetUrl',
-            'Status',
-            'ParcelNickname',
+                'APO_ADDRESS',
+                'PSTL_TOWN',
+                'PSTL_STATE',
+                'PSTL_ZIP5',
+                'JURISDICTION',
+                'COUNTY',
+                'OWNERSHIP_TYPE',
+                'COUNTY_LANDUSE_DESCRIPTION',
+                'EXISTING_LANDUSE',
+                'REGIONAL_LANDUSE',
+                'AS_SUM',
+                'TAX_SUM',
+                'TAX_YEAR',
+                'YEAR_BUILT',
+                'UNITS',
+                'BEDROOMS',
+                'BATHROOMS',
+                'BUILDING_SQFT',
+                'ESTIMATED_COVERAGE_ALLOWED',
+                'IMPERVIOUS_SURFACE_SQFT',
+                'CATCHMENT',
+                'PLAN_ID',
+                'PLAN_NAME',
+                'ZONING_ID',
+                'ZONING_DESCRIPTION',
+                'TOWN_CENTER',
+                'LOCATION_TO_TOWNCENTER',
+                'WITHIN_TRPA_BNDY',
+                'LOCAL_PLAN_HYPERLINK',
+                'DESIGN_GUIDELINES_HYPERLINK',
+                'LTINFO_HYPERLINK',
+                'PARCEL_ACRES',
+                'PARCEL_SQFT',
+                'WITHIN_BONUSUNIT_BNDY',
+                'PERCENT_COVERAGE_ALLOWED',
+                'MF_ALLOWED',
+            #IPES Fields
             'IPESScore',
             'IPESScoreType',
             'BaseAllowableCoveragePercent',
@@ -242,10 +272,20 @@ try:
             'SEZSetbackArea',
             'InternalNotes',
             'PublicNotes',
+            # Deed fields
+            # 'RecordingNumber',
+            # 'RecordingDate',
+            # 'Description',
+            # 'DeedRestrictionStatus',
+            # 'DeedRestrictionType',
+            # 'ProjectAreaFileNumber',
+            # 'ScoreSheetUrl',
+            # 'Status',
+            # 'ParcelNickname',
             'SHAPE']
             
     # update staging feature class from dataframe
-    updateStagingLayer(name, combined_df, fields)
+    updateStagingLayer(name, df, fields)
     
     #---------------------------------------------------------------------------------------#
     # report how long it took to get the data
