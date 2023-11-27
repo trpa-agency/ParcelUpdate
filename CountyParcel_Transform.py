@@ -21,6 +21,7 @@ This script runs on the 16th of each month at 1am on Arc10 from scheduled task "
 #----------------------------------------------------------------------
 # import packages
 import os
+import sys
 import re
 import logging
 from datetime import datetime 
