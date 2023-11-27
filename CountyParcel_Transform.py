@@ -3549,7 +3549,7 @@ try:
     print("Parcel_County_Staging is good to go")
     logger.info("Parcel County Staging is good to go")
 
-    logger.info("\nTime it took to run this script: {}".format(FINALendTimer))
+    # logger.info("\nTime it took to run this script: {}".format(FINALendTimer))
    
     header = "SUCCESS - Parcel_County_Staging feature class was updated."
     # send email with header based on try/except result
