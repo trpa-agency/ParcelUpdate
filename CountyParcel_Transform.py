@@ -388,6 +388,9 @@ def send_mail(body):
 # START TRANSFORMATION
 #-----------------------------------------------------------------------
 try:
+    # start timer for the get data requests
+    startTimer = datetime.datetime.now()
+
     #-----------------------------------------------------------------------
     # CARSON COUNTY TRANSFORMATION
     #-----------------------------------------------------------------------
@@ -3548,10 +3551,12 @@ try:
 
     print("Parcel_County_Staging is good to go")
     logger.info("Parcel County Staging is good to go")
+    
+    # report how long it took to run the script
+    runTime = datetime.datetime.now() - startTimer
+    logger.info(f"\nTime it took to run this script: {runTime}")
 
-    # logger.info("\nTime it took to run this script: {}".format(FINALendTimer))
-   
-    header = "SUCCESS - Parcel_County_Staging feature class was updated."
+    header = "SUCCESS - Parcel_County_Staging feature class updated."
     # send email with header based on try/except result
     send_mail(header)
 
