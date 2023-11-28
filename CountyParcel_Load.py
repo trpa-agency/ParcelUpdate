@@ -145,7 +145,7 @@ def differenceDictionary(df1, df2, key_field, fields_to_ignore):
             if df1[column].dtype=='int64':
                 df1[column]=df1[column].astype('Int64')
             df2.loc[:, column] = df2[column].astype(df1[column].dtype)
-    #    
+    #make an index from multiple fields    
     df1 = df1.set_index(key_field)
     df2 = df2.set_index(key_field)
     df1.sort_index(inplace=True)
@@ -158,7 +158,7 @@ def differenceDictionary(df1, df2, key_field, fields_to_ignore):
     if diff_df.empty:
         return {}
     new_values =diff_df.loc[:,pd.IndexSlice[:,'other']].droplevel(1,axis=1)
-    #
+    #This wouldn't have to be modified
     dict_update = new_values.to_dict('index')
     #
     new_dict = {k: {a: b for a, b in v.items() if not pd.isnull(b)} 
