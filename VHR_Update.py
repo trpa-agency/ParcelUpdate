@@ -125,6 +125,8 @@ EL_VHR = renamecolumns(eldorado_data, EL_Field_Mapping, 'EL', 'EL')
 EL_VHR['APN'] = EL_VHR['APN'].str[:3]+'-'+EL_VHR['APN'].str[3:6]+'-'+EL_VHR['APN'].str[6:9]
 PL_VHR = renamecolumns(placer_data, PL_Field_Mapping, 'PL', 'PL')
 PL_VHR['APN']=PL_VHR['APN'].str[:11]
+#This looks like an error where a permit was given to a vacant FS parcel
+PL_VHR=PL_VHR[PL_VHR['APN']!='084-023-005']
 DG_VHR = renamecolumns(douglas_data, DG_Field_Mapping, 'DG', 'DG')
 DG_VHR['APN']=DG_VHR['APN'].astype(str)
 DG_VHR['APN'] = DG_VHR['APN'].str[:4]+'-'+DG_VHR['APN'].str[4:6]+'-'+DG_VHR['APN'].str[6:9]+'-'+DG_VHR['APN'].str[9:12]
@@ -134,10 +136,13 @@ WA_VHR['APN']=WA_VHR['APN']
 CSLT_VHR = renamecolumns(CSLT__VHR_data, CSLT_Field_Mapping, 'EL', 'CSLT')
 CSLT_VHR['APN'] = CSLT_VHR['APN']
 CSLT_VHR['expiration_date']=pd.to_datetime(CSLT_VHR['expiration_date'], unit='ms')
+#Drop a weird heavenly permit I need to ask Ryan about
+CSLT__VHR=CSLT_VHR[CSLT_VHR['APN']!='029-490-001']
 CSLT_Hosted=renamecolumns(CSLT_Hosted_Rental_Data, CSLT_Hosted_Mapping, 'EL','CSLT')
 CSLT_Hosted['Rental_Type']="Hosted Rental"
 VHR_Data = pd.concat([EL_VHR, PL_VHR, DG_VHR, WA_VHR, CSLT_VHR, CSLT_Hosted])
-
+#El Dorado has duplicate records where there are multiple contacts so we drop duplicates
+VHR_Data = VHR_Data.drop_duplicates()
 VHR_Data['Rental_Type']=VHR_Data['Rental_Type'].fillna('VHR')
 VHR_Data.loc[(VHR_Data['jurisdiction']=='CSLT')&(VHR_Data['Status'].isna()), 'Status'] = VHR_Data.loc[(VHR_Data['jurisdiction']=='CSLT')&(VHR_Data['Status'].isna()),'expiration_date'].apply(before_or_after_today)
 
