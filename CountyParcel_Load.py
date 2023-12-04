@@ -15,7 +15,7 @@ import time
 from time import strftime
 
 # environment settings
-arcpy.env.workspace = "//Trpa-fs01/GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb"
+arcpy.env.workspace = "F:\GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb"
 arcpy.env.overwriteOutput = True
 arcpy.env.outputCoordinateSystem = arcpy.SpatialReference(26910)
 
@@ -23,14 +23,14 @@ arcpy.env.outputCoordinateSystem = arcpy.SpatialReference(26910)
 #script_directory = os.path.dirname(os.path.abspath(__file__))
 
 # set workspace and sde connections 
-workspace = "//Trpa-fs01/GIS/PARCELUPDATE/Workspace/Staging"
+workspace = "F:\GIS/PARCELUPDATE/Workspace/Staging"
 
 # network path to connection files
-#filePath = "//Trpa-fs01/GIS/PARCELUPDATE/Workspace/"
+#filePath = "F:\GIS/PARCELUPDATE/Workspace/"
 
 
 #This needs to be shifted over to SQL Table
-df_special_parcels= pd.read_excel("//Trpa-fs01/GIS/PARCELUPDATE/Workspace/special_parcels.xlsx")
+df_special_parcels= pd.read_excel("F:\GIS/PARCELUPDATE/Workspace/special_parcels.xlsx")
 
 """ #Create Local Database Connection
 # Enterprise geodatabase connection parameters
@@ -380,7 +380,7 @@ def get_text_fields(feature_class):
     return field_list
 
 #Create database connection
-inWorkspace = "//Trpa-fs01\GIS\PARCELUPDATE\Workspace\Vector.sde"
+inWorkspace = "F:\GIS\PARCELUPDATE\Workspace\Vector.sde"
 arcpy.env.workspace = inWorkspace
 # Specify the name of the new version and the parent version
 new_version_name = "Parcel_Update_" + strftime("%Y-%m-%d")
@@ -393,7 +393,7 @@ arcpy.MakeFeatureLayer_management(r'SDE.Parcels\SDE.Parcels_Base',parcelBase)
 
 parcelNew = 'parcelNew'
 
-arcpy.MakeFeatureLayer_management("//Trpa-fs01/GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb/Parcel_County_Staging", parcelNew)
+arcpy.MakeFeatureLayer_management("F:\GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb/Parcel_County_Staging", parcelNew)
 
 # Create a new version
 arcpy.CreateVersion_management(inWorkspace, parent_version, new_version_name, "PUBLIC")
@@ -436,7 +436,7 @@ dfparcelMaster = generate_spatial_dataframe(parcelMaster, data_type_mapping, fie
 
 # filter to new parcels within TRPA boundary
 dfparcelNew=dfparcelNew.loc[dfparcelNew['WITHIN_TRPA_BNDY']==1]
-df_special_parcels = pd.read_excel("//Trpa-fs01/GIS/PARCELUPDATE/Workspace/special_parcels.xlsx")
+df_special_parcels = pd.read_excel("F:\GIS/PARCELUPDATE/Workspace/special_parcels.xlsx")
 matching_apns_parcel_master = return_matching_apns(parcelMaster, parcelNew, df_special_parcels)
 
 # filter parcel master to matching APNs
@@ -537,7 +537,7 @@ dfparcelBase = generate_spatial_dataframe(parcelBase, data_type_mapping, fields_
 
 # filter to new parcels within TRPA boundary
 dfparcelNew=dfparcelNew.loc[dfparcelNew['WITHIN_TRPA_BNDY']==1]
-#df_special_parcels = pd.read_excel("//Trpa-fs01/GIS/PARCELUPDATE/Workspace/special_parcels.xlsx")
+#df_special_parcels = pd.read_excel("F:\GIS/PARCELUPDATE/Workspace/special_parcels.xlsx")
 matching_apns_parcel_base = return_matching_apns(parcelBase, parcelNew, df_special_parcels)
 
 # filter parcel master to matching APNs
@@ -608,7 +608,7 @@ arcpy.CreateDatabaseConnection_management(
     version_type='TRANSACTIONAL'
 )
 
-filepath = "//Trpa-fs01/GIS/PARCELUPDATE/Workspace/Parcel_Old_New/"
+filepath = "F:\GIS/PARCELUPDATE/Workspace/Parcel_Old_New/"
 parcel_list_name = "Parcel_Old_New" + strftime("%Y-%m-%d")+".csv"
 df_parcel_changes.to_csv(filepath+parcel_list_name, index=False)
 
