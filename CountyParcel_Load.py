@@ -334,14 +334,22 @@ def update_parcel_geometry(featureLayer, new_parcels, edit_session):
     sourceFieldsList_key = ['APN', 'JURISDICTION']
     sourceFieldsList_value = ['SHAPE@']
     fieldJoinCalc_multikey(featureLayer, updateFieldsList_key, updateFieldsList_value, newShapes, sourceFieldsList_key, sourceFieldsList_value, edit_session)
+    
+    #Updated_APNS
+    selected_values = [row[0] for row in arcpy.da.SearchCursor(newShapes, 'APN')]
 
+    # Create a Pandas DataFrame
+    updated_shapes = pd.DataFrame({'APN': selected_values})
+    updated_shapes_csv = "Updated_Geom_" + strftime("%Y-%m-%d")+".csv"
+    # Export the DataFrame to a CSV file
+    updated_shapes.to_csv(updated_shapes_csv, index=False)
     # Get the count of selected features
     result = arcpy.management.GetCount(newShapes)
     count = int(result.getOutput(0))
     # number of shapes shifted
     print(f"{count} shapes shifted.")
     wkt_file_name = "Updated_Shapes_" + strftime("%Y-%m-%d")+".wkt"
-    #Write to a wky file
+    #Write to a wkt file
     generate_updated_shape_wkt(newShapes, wkt_file_name)
     
 @timer
@@ -403,7 +411,7 @@ prefix_remove = ('880','881','910','920','500', '510', '520', '530', '560', '570
 # parcel master old/new
 parcel_master_new_apn = old_new_parcels_list(parcelMaster, parcelNew, 'Yes', 
                                              prefix_remove,'New APN')
-parcel_master_old_apn = old_new_parcels_list(parcelBase, parcelNew, 'No', 
+parcel_master_old_apn = old_new_parcels_list(parcelMaster, parcelNew, 'No', 
                                              prefix_remove,'Old APN')
 # parcel base old/new
 parcel_base_new_apn   = old_new_parcels_list(parcelBase, parcelNew, 'Yes', 
