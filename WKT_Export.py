@@ -1,5 +1,6 @@
 import arcpy
 import requests
+import pandas as pd
 import os
 import time
 
@@ -11,7 +12,7 @@ arcpy.env.overwriteOutput = True
 filePath   = "C:\\GIS\\DB_CONNECT"
 sdeBase    = os.path.join(filePath, "Vector.sde")
 parcelBase = os.path.join(sdeBase, 'SDE.Parcels\SDE.Parcels_Base')
-
+newShapeCSV= os.path.join()
 #output projected in-memory feature class
 parcelLayerProjected = "ParcelLayerProjected"
 
@@ -21,8 +22,14 @@ outCS = arcpy.SpatialReference(4326)
 # run project tool
 arcpy.Project_management(parcelBase, parcelLayerProjected, outCS)
 
+# get list of shapes by APN
+
+dfShape = pd.read_csv(newShapeCSV)
+
+newShapes = tuple(dfShape.APN)
+
 # where clause to limit parcels
-where = "APN IN ('029-041-009', '016-091-020', '090-225-018')"
+where = f"APN IN {newShapes}"
 
 # #  make feature layer from parcel base
 # parcelLayer = arcpy.management.MakeFeatureLayer("ParcelLayerProjected", "Parcel_Layer", where_clause=where)
