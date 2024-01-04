@@ -23,18 +23,18 @@ outCS = arcpy.SpatialReference(4326)
 arcpy.Project_management(parcelBase, parcelLayerProjected, outCS)
 
 # get list of shapes by APN
-
 dfShape = pd.read_csv(newShapeCSV)
 
+# get tuple of new shapes
 newShapes = tuple(dfShape.APN)
 
 # where clause to limit parcels
 where = f"APN IN {newShapes}"
 
 # #  make feature layer from parcel base
-# parcelLayer = arcpy.management.MakeFeatureLayer("ParcelLayerProjected", "Parcel_Layer", where_clause=where)
+parcelLayer = arcpy.management.MakeFeatureLayer("ParcelLayerProjected", "Parcel_Layer", where_clause=where)
 
-parcelLayer = arcpy.management.MakeFeatureLayer("ParcelLayerProjected", "Parcel_Layer")
+# parcelLayer = arcpy.management.MakeFeatureLayer("ParcelLayerProjected", "Parcel_Layer")
 
 # time a function function
 ## use as decorator @timer
