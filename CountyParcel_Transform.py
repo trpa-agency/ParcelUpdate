@@ -560,14 +560,14 @@ try:
             mail_city = row[43]        
     #         mail_city.split(',',1)[0]
             if not (mail_city is None or mail_city=='' or mail_city.isspace()==True):
-                row[14] = mail_city.strip().split(',',1)[0]
+                row[14] = mail_city.strip().split(',',1)[0].strip()
             else:
                 row[14] = ''
                 
             # Mailing State
             mail_state = row[43]
             if not (mail_state is None or mail_state=='' or mail_state.isspace()==True):
-                row[15] = mail_state.strip().rsplit(',')[-1]
+                row[15] = mail_state.strip().rsplit(',')[-1].strip()
             else:
                 row[15] = ''
             
