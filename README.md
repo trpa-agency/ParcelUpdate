@@ -18,6 +18,8 @@ The load process moves the new geometries and attributes from the staged parcel 
 * Updated the scripts metadata and structure
   
 ## Future Enhancements
+* Add Status field and make it 1 character long string always set to A
+* Remove Littoral field from schema. Littoral defintion is not being met by spatial means. 
 * Improve script metadata, error handling, and logging
 * Create an automated way via email to notify staff of new and obsolete parcels
 * Add QA/QC script
