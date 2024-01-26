@@ -3478,7 +3478,7 @@ try:
 
     ### Estimated Percent Coverage Allowed Update---------------------------------------------------------------------###
     percentCalc = (["ESTIMATED_COVERAGE_ALLOWED_TRPA"]/["PARCEL_SQFT_TRPA"])*100
-    
+
     with arcpy.da.UpdateCursor(ParcelLayer, ['ESTIMATED_PERCENT_COVERAGE_TRPA']) as cursor:
         for row in cursor:
             row[0] = percentCalc
@@ -3487,8 +3487,8 @@ try:
 
     ### IPES Score Update --------------------------------------------------------------------------------------------###
     # transfer attributes to Parcel Layer
-    fieldJoinCalc_multikey(ParcelLayer, ['APN_TRPA', 'COUNTY_TRPA'],['IPES_TRPA'], 
-                sde_collect_IPES, ['APN', 'COUNTY'],['IPES_Score'])
+    fieldJoinCalc_multikey(ParcelLayer, ['APN_TRPA', 'JURISDICTION_TRPA'],['IPES_TRPA'], 
+                sde_collect_IPES, ['APN', 'JURISDICTION'],['IPESScore'])
     print("The 'IPES_TRPA' field in the parcel data has been updated")
 
     ### Set Status to Active--------------------------------------------------------------------------------------------------------###
