@@ -39,10 +39,10 @@ arcpy.env.overwriteOutput = True
 arcpy.env.outputCoordinateSystem = arcpy.SpatialReference(26910)
 
 # set workspace and sde connections 
-workspace = "//Trpa-fs01/GIS/PARCELUPDATE/Workspace/Staging"
+workspace = "F:/GIS/PARCELUPDATE/Workspace/Staging"
 
 # network path to connection files
-filePath = "//Trpa-fs01/GIS/PARCELUPDATE/Workspace/"
+filePath = "F:/GIS/PARCELUPDATE/Workspace/"
 # database file path 
 sdeBase    = os.path.join(filePath, "Vector.sde/")
 sdeCollect = os.path.join(filePath, "Collection.sde")
@@ -50,11 +50,11 @@ sdeTabular = os.path.join(filePath, "Tabular.sde")
 
 # portal signin
 ## TRPA_ADMIN credentials 
-portal_user = "TRPA_PORTAL_ADMIN"
-portal_pwd = str(os.environ.get('Password'))
-portal_url = "https://maps.trpa.org/portal/"
-# sign in
-arcpy.SignInToPortal(portal_url, portal_user, portal_pwd)
+# portal_user = "TRPA_PORTAL_ADMIN"
+# portal_pwd = str(os.environ.get('Password'))
+# portal_url = "https://maps.trpa.org/portal/"
+# # sign in
+# arcpy.SignInToPortal(portal_url, portal_user, portal_pwd)
 
 # Parcel AOI to select parcels to keep (includes TRPA Boundary and Olympic Valley Watershed)
 parcelAOI = "Parcel_AOI"

@@ -284,20 +284,21 @@ def delete_old_parcels(featureLayer, oldAPNs, edit_session):
 @timer
 def insert_new_parcels(featureLayer, new_APNs, new_parcels, fields, edit_session):
     new_count = 0
-    where_clause = f"{arcpy.AddFieldDelimiters(featureLayer, 'APN')} IN "+str(tuple(new_APNs))
-    print(where_clause)
-    with arcpy.da.SearchCursor(new_parcels, fields, where_clause) as search_cursor:
-    # Open an insert cursor to the destination feature class
-        edit_session.startOperation()
-        with arcpy.da.InsertCursor(featureLayer, fields) as insert_cursor:
-            # insert the rows from the serach cursor
-            for row in search_cursor:
-                
-                insert_cursor.insertRow(row)
-                
-                new_count +=1
-                print(f"{new_count} rows inserted into {featureLayer}.")
-        edit_session.stopOperation()
+    if len(new_APNs) == 0:
+        print("No new APNs")
+    else:
+        where_clause = f"{arcpy.AddFieldDelimiters(featureLayer, 'APN')} IN "+str(tuple(new_APNs))
+        print(where_clause)
+        with arcpy.da.SearchCursor(new_parcels, fields, where_clause) as search_cursor:
+        # Open an insert cursor to the destination feature class
+            edit_session.startOperation()
+            with arcpy.da.InsertCursor(featureLayer, fields) as insert_cursor:
+                # insert the rows from the serach cursor
+                for row in search_cursor:
+                    insert_cursor.insertRow(row)
+                    new_count +=1
+                    print(f"{new_count} rows inserted into {featureLayer}.")
+            edit_session.stopOperation()
                 
 def generate_updated_shape_wkt(featureLayer, wkt_file_name):
     # Open the output text file for writing
