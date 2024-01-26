@@ -349,19 +349,20 @@ def fieldJoinCalc_multikey(updateFC, updateFieldsList_key, updateFieldsList_valu
     print ("Started data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
     # Use list comprehension to build a dictionary from arcpy SearchCursor  
     total_count=0
-    valueDict = {(r[0]+r[1]):(r[2]) for r in arcpy.da.SearchCursor(sourceFC, (sourceFieldsList_key + sourceFieldsList_value))}  
+    valueDict = {(r[0]+r[1]):(r[2]) for r in arcpy.da.SearchCursor(sourceFC, (sourceFieldsList_key + sourceFieldsList_value)) if r[0] is not None and r[1] is not None}  
     with arcpy.da.UpdateCursor(updateFC, (updateFieldsList_key+ updateFieldsList_value)) as updateRows:  
         for updateRow in updateRows:  
             # store the Join value of the row being updated in a keyValue variable  
-            keyValue = updateRow[0]+updateRow[1]
-            # verify that the keyValue is in the Dictionary  
-            if keyValue in valueDict:
-                total_count +=1
-                if (total_count%1000)==0:
-                    print (f"Updating row {total_count}")
-                # transfer the value stored under the keyValue from the dictionary to the updated field.  
-                updateRow[2] = valueDict[keyValue]  
-                updateRows.updateRow(updateRow)    
+            if updateRow[0] is not None and updateRow[1] is not None:
+                keyValue = updateRow[0]+updateRow[1]
+                # verify that the keyValue is in the Dictionary  
+                if keyValue in valueDict:
+                    total_count +=1
+                    if (total_count%1000)==0:
+                        print (f"Updating row {total_count}")
+                    # transfer the value stored under the keyValue from the dictionary to the updated field.  
+                    updateRow[2] = valueDict[keyValue]  
+                    updateRows.updateRow(updateRow)    
     del valueDict  
     logger.info("Finished data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
 
@@ -2954,6 +2955,22 @@ try:
                             "JOIN_ONE_TO_ONE", "KEEP_ALL", "", "HAVE_THEIR_CENTER_IN", "", "")
     print ("Finished the Regional Land Use Spatial Join: " + strftime("%Y-%m-%d %H:%M:%S"))
     # log.info("Finished the Regional Land Use Spatial Join: " + strftime("%Y-%m-%d %H:%M:%S"))
+        # Create an expression to find records with null values in either field
+    print('Checking For Nulls')
+
+    expression = f"{'APN_TRPA'} IS NULL OR {'COUNTY_TRPA'} IS NULL"
+
+    # Use an UpdateCursor to delete records with null values
+    with arcpy.da.UpdateCursor(ParcelLayer, ['APN_TRPA', 'COUNTY_TRPA'], where_clause=expression) as cursor:
+        for row in cursor:
+            cursor.deleteRow()
+            print("One row dropped from tHE PARCEL LAYER")
+
+    with arcpy.da.UpdateCursor(ParcelPoint_RegionalLandUse, ['APN_TRPA', 'COUNTY_TRPA'], where_clause=expression) as cursor:
+        for row in cursor:
+            cursor.deleteRow()
+            print("One row dropped from regional Land Use")
+    
 
     # transfer attributes to Parcel Layer
     fieldJoinCalc_multikey(ParcelLayer, ['APN_TRPA', 'COUNTY_TRPA'],['REGIONAL_LANDUSE_TRPA'], 

@@ -53,10 +53,13 @@ filePath = "C:\\GIS\\DB_CONNECT"
 # database file path 
 sdeBase = os.path.join(filePath, "Vector.sde")
 sdeCollect = os.path.join(filePath, "Collection.sde")
+sdeTabular = os.path.join(filePath, "Tabular.sde")
+
 # Feature dataset to unversion and register as version
 fdata = sdeCollect + "\\sde_collection.SDE.Parcel"
 # string to use in updaetSDE function
 sdeString  = fdata + "\\sde_collection.SDE."
+
 # local path to stage csvs in
 accelaFiles = "//trpa-fs01/GIS/Acella/Reports"
 
@@ -138,6 +141,31 @@ def updateStagingLayer(name, df, fields):
     print(f"\nUpdated staging layer:{outFC}")
     logger.info(f"\nUpdated staging layer:{outFC}")
 
+# replaces table in sde_tabular
+def updateSDETabularTable(tables):
+    for table in tables:
+        inputTbl = os.path.join(workspace, table)
+        dsc = arcpy.Describe(inputFC)
+        fields = dsc.fields
+        out_fields = [dsc.OIDFieldName, dsc.lengthFieldName, dsc.areaFieldName]
+        fieldnames = [field.name if field.name != 'Shape' else 'SHAPE@' for field in fields if field.name not in out_fields]
+        outTbl = sdeTbl + table
+        # deletes all rows from the SDE feature class
+        arcpy.TruncateTable_management(table)
+        logger.info("\nDeleted all records in: {}\n".format(table))
+        from time import strftime  
+        logger.info("Started data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
+        # insert rows from Temporary feature class to SDE feature class
+        with arcpy.da.InsertCursor(table, fieldnames) as oCursor:
+            count = 0
+            with arcpy.da.SearchCursor(inputTbl, fieldnames) as iCursor:
+                for row in iCursor:
+                    oCursor.insertRow(row)
+                    count += 1
+                    if count % 100 == 0:
+                        logger.info("Inserting record %d into %s SDE feature class" % (count, outTbl))
+                logger.info(f"\nDone updating: {outTbl}")
+            
 # replaces features in outfc with exact same schema
 def updateSDECollectFC(fcList):
     for fc in fcList:
@@ -198,11 +226,19 @@ def getAccelaLTinfoFiles(csvDict):
 # start timer for the get data requests
 startTimer = datetime.datetime.now()
 
-# # dictionary of acella reports from ltinfo (check with ESA for updates or issues to their API)
-# ltinfoDict = {'Accela_Parcels.csv'         : 'https://qa.laketahoeinfo.org/Api/GetAccelaParcelsCsv/1A77D078-B83E-44E0-8CA5-8D7429E1A6B4',
-#               'Accela_Record_Details.csv'  : 'https://qa.laketahoeinfo.org/Api/GetAccelaRecordDetailsCsv/1A77D078-B83E-44E0-8CA5-8D7429E1A6B4',
-#               'Accela_Record_Documents.csv': 'https://qa.laketahoeinfo.org/Api/GetAccelaRecordDocumentsCsv/1A77D078-B83E-44E0-8CA5-8D7429E1A6B4'
-#              }
+# dictionary of acella reports from ltinfo (check with ESA for updates or issues to their API)
+ltinfoDict = {'Accela_Parcels.csv'         : 'https://laketahoeinfo.org/Api/GetAccelaParcelsExcel/1A77D078-B83E-44E0-8CA5-8D7429E1A6B4',
+              'Accela_Record_Details.csv'  : 'https://laketahoeinfo.org/Api/GetAccelaRecordDetailsExcel/1A77D078-B83E-44E0-8CA5-8D7429E1A6B4',
+              'Accela_Record_Documents.csv': 'https://laketahoeinfo.org/Api/GetAccelaRecordDocumentsExcel/1A77D078-B83E-44E0-8CA5-8D7429E1A6B4'
+             }
+
+# function to save Accela Reports from LTinfo API
+getAccelaLTinfoFiles(ltinfoDict)
+
+# make dataframes from exported accela views
+
+dfAParcel  = pd.read_excel(os.path.join(accelaFiles, 'Accela_Parcels.csv'))
+dfAPermit  = pd.read_excel(os.path.join(accelaFiles, 'Accela_Record_Details.csv'))
 
 # # function to save Accela Reports from LTinfo API
 # getAccelaLTinfoFiles(ltinfoDict, accelaFiles, logger)
@@ -225,9 +261,9 @@ dfSoil     = pd.read_csv(os.path.join(accelaFiles, 'Hydro_Soils.csv'))
 dfHist     = pd.read_csv(os.path.join(accelaFiles, 'Historic_Designations.csv'))
 dfGrade    = pd.read_csv(os.path.join(accelaFiles, 'Grading_Exception_Map.csv'))
 # dfSecurity = pd.read_csv(os.path.join(accelaFiles, 'Accela_Security.csv'))
-# dfAParcel  = pd.read_csv(os.path.join(accelaFiles, 'Accela_Parcels.csv'))
-# dfAPermit  = pd.read_csv(os.path.join(accelaFiles, 'Accela_Record_Details.csv'),   on_bad_lines='skip')
-# dfADoc     = pd.read_csv(os.path.join(accelaFiles, 'Accela_Record_Documents.csv'), on_bad_lines='skip')
+dfAParcel  = pd.read_excel(os.path.join(accelaFiles, 'Accela_Parcels.xlsx'))
+dfAPermit  = pd.read_excel(os.path.join(accelaFiles, 'Accela_Record_Details.xlsx'))
+dfADoc     = pd.read_csv(os.path.join(accelaFiles, 'Accela_Record_Documents.xlsx'))
 
 # get BMP Status data as dataframe from BMP SQL Database
 with engine.begin() as bmpConnect:
