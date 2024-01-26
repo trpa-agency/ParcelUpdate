@@ -85,6 +85,9 @@ sde_TAZ              = sdeBase + "\\sde.SDE.Transportation\\sde.SDE.Transportati
 sde_Littoral         = sdeBase + "\\sde.SDE.Shorezone\\sde.SDE.LittoralParcel"
 sde_Tolerance        = sdeBase + "\\sde.SDE.Shorezone\\sde.SDE.Tolerance_District"
 
+# sde Collect feature classes to use for attribution
+sde_collect_IPES     = os.path.join(sdeCollect, 'SDE.Parcel\SDE.Parcel_LTinfo_IPES')
+
 # in memory fcs to use in the attribution stage
 memory = "memory" + "\\"
 ParcelPoint_RegionalLandUse = memory + "ParcelPoint_RegionalLandUse"
@@ -164,7 +167,9 @@ trpaFields = [
 ['REGIONAL_LANDUSE_TRPA', 'TEXT', 'Regional Landuse', 50], 
 # Fields for soil, watershed, etc...
 ['ESTIMATED_COVERAGE_ALLOWED_TRPA', 'DOUBLE', "Estimate of Coverage Allowed (Bailey, sq.ft.)"],
+['ESTIMATED_PERCENT_COVERAGE_ALLOWED_TRPA', 'DOUBLE', "Estimated Percent Coverage Allowed (Bailey, sq.ft.)"],
 ['IMPERVIOUS_SURFACE_SQFT_TRPA', 'DOUBLE', "Impervious Surface (Remote Sensing, sq.ft.)"],
+
 ['SOIL_1974_TRPA', 'TEXT','NRCS Soils 1974', 5],
 ["SOIL_2003_TRPA", "TEXT", "NRCS Soils 2003", 5],
 ["CATCHMENT_TRPA", "TEXT", "Catchment", 150],
@@ -184,13 +189,14 @@ trpaFields = [
 ["TOLERANCE_ID_TRPA", "TEXT", 'Tolerance ID', 50],
 ["TAZ_TRPA", "DOUBLE",'Transportation Analysis Zone'],
 ["INDEX_1987_TRPA", "TEXT", "1987 Parcel Map Index",10],
-["LITTORAL_TRPA", "SHORT", "Littoral"],
+["IPES_TRPA", "LONG", "IPES Score"],
 ["WITHIN_TRPA_BNDY_TRPA", "SHORT","Within TRPA Boundary?"],
 ["WITHIN_BONUSUNIT_BNDY_TRPA", "SHORT", "Within Bonus Unit Boundary"],
 ["LOCAL_PLAN_HYPERLINK_TRPA", "TEXT", "Local Plan Hyperlink", 255],
 ["DESIGN_GUIDELINES_HYPERLINK_TRPA", "TEXT", "Design Guidelines", 255],
 ["LTINFO_HYPERLINK_TRPA", "TEXT", "LTinfo Parcel Details", 255],
 ["INDEX_1987_HYPERLINK_TRPA", "TEXT", "Index 1987 Hyperlink", 255],
+["STATU_TRPA",'TEXT',"Status",2],
 # Fields for Parcel Size
 ["PARCEL_ACRES_TRPA", "DOUBLE", "Acres"],
 ["PARCEL_SQFT_TRPA", "DOUBLE", "Square Feet"] 
@@ -3247,7 +3253,7 @@ try:
                 ParcelPoint_TownCenterBuffer, ['APN_TRPA', 'COUNTY_TRPA'],['BUFFER_NAME'])
     print ("The 'LOCATION_TO_TOWNCENTER' field in the parcel data has been updated")
     # log.info("The 'LOCATION_TO_TOWNCENTER' field in the parcel data has been updated")
-
+    
     ### Catchment Attribute Update ------------------------------------------------------------------------------------### 
     print("Starting the Catchment Spatial Join: " + strftime("%Y-%m-%d %H:%M:%S"))
     # log.info("Starting the Catchment Spatial Join: " + strftime("%Y-%m-%d %H:%M:%S"))
@@ -3262,35 +3268,6 @@ try:
                 ParcelPoint_Catchment, ['APN_TRPA', 'COUNTY_TRPA'],['Name'])
     print ("The 'Catchment' field in the parcel data has been updated")
     # log.info("The 'Catchment' field in the parcel data has been updated")
-
-    ### Littoral Parcel Attribute Update -----------------------------------------------------------------------------###
-    print("Identifying Littoral parcels: " + strftime("%Y-%m-%d %H:%M:%S"))
-    # log.info('Identifying Littoral parcels: ' + strftime("%Y-%m-%d %H:%M:%S"))
-
-    # Select parcels that have their center within
-    littoralSelect = arcpy.SelectLayerByLocation_management(ParcelLayer, 
-                                                            'HAVE_THEIR_CENTER_IN', 
-                                                            sde_Littoral, 
-                                                            0, 
-                                                            'NEW_SELECTION')
-    # Update field 1= yes 0 = no
-    with arcpy.da.UpdateCursor(littoralSelect, ['LITTORAL_TRPA']) as cursor:
-        for row in cursor:
-            row[0] = '1'
-            cursor.updateRow(row) 
-    del cursor 
-
-    # switch the selection
-    litSelect = arcpy.SelectLayerByAttribute_management(littoralSelect,'SWITCH_SELECTION')
-
-    # update other parcels
-    with arcpy.da.UpdateCursor(litSelect, ['LITTORAL_TRPA']) as cursor:
-        for row in cursor:
-            row[0] = '0'
-            cursor.updateRow(row)
-    del cursor
-    print("Littoral parcels updated: " + strftime("%Y-%m-%d %H:%M:%S"))
-    # log.info("Littoral parcels Updated: " + strftime("%Y-%m-%d %H:%M:%S"))
 
     ### Tolerance ID -------------------------------------------------------------------------------------------------###
     print("Starting the Tolerance District Spatial Join: " + strftime("%Y-%m-%d %H:%M:%S"))
@@ -3482,6 +3459,7 @@ try:
     # log.info("Bonus Unit Boundary Updated: " + strftime("%Y-%m-%d %H:%M:%S"))
     result = arcpy.GetCount_management(ParcelLayer)
     print('{} has {} records now.'.format(ParcelLayer, result[0]))
+
     ### Calculate Area Field------------------------------------------------------------------------------------------###
     print("Calculating Acres..." + strftime("%Y-%m-%d %H:%M:%S"))
     with arcpy.da.UpdateCursor(ParcelLayer, ['PARCEL_ACRES_TRPA', 'SHAPE@']) as cursor:
@@ -3498,6 +3476,28 @@ try:
             cursor.updateRow(row)
     del cursor
 
+    ### Estimated Percent Coverage Allowed Update---------------------------------------------------------------------###
+    percentCalc = (["ESTIMATED_COVERAGE_ALLOWED_TRPA"]/["PARCEL_SQFT_TRPA"])*100
+    
+    with arcpy.da.UpdateCursor(ParcelLayer, ['ESTIMATED_PERCENT_COVERAGE_TRPA']) as cursor:
+        for row in cursor:
+            row[0] = percentCalc
+            cursor.updateRow(row) 
+    del cursor  
+
+    ### IPES Score Update --------------------------------------------------------------------------------------------###
+    # transfer attributes to Parcel Layer
+    fieldJoinCalc_multikey(ParcelLayer, ['APN_TRPA', 'COUNTY_TRPA'],['IPES_TRPA'], 
+                sde_collect_IPES, ['APN', 'COUNTY'],['IPES_Score'])
+    print("The 'IPES_TRPA' field in the parcel data has been updated")
+
+    ### Set Status to Active--------------------------------------------------------------------------------------------------------###
+    with arcpy.da.UpdateCursor(ParcelLayer, ['STATUS_TRPA']) as cursor:
+        for row in cursor:
+            row[0] = 'A'
+            cursor.updateRow(row) 
+    del cursor   
+
     ### Copy to Feature Class ----------------------------------------------------------------------------------------###
     print("Copying memory features to staging: " + strftime("%Y-%m-%d %H:%M:%S"))
     # copy in-memory features to staging feature class
@@ -3506,7 +3506,6 @@ try:
 
     arcpy.Delete_management("memory")
     print("Deleted Memory Workspace: " + strftime("%Y-%m-%d %H:%M:%S"))
-
 
     #---------------------------------
     # REPLACE NULL
