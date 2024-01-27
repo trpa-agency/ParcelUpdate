@@ -167,7 +167,7 @@ trpaFields = [
 ['REGIONAL_LANDUSE_TRPA', 'TEXT', 'Regional Landuse', 50], 
 # Fields for soil, watershed, etc...
 ['ESTIMATED_COVERAGE_ALLOWED_TRPA', 'DOUBLE', "Estimate of Coverage Allowed (Bailey, sq.ft.)"],
-['ESTIMATED_PERCENT_COVERAGE_ALLOWED_TRPA', 'DOUBLE', "Estimated Percent Coverage Allowed (Bailey, sq.ft.)"],
+['ESTIMATED_PRCNT_COV_ALLOWED_TRPA', 'DOUBLE', "Estimated Percent Coverage Allowed (Bailey, sq.ft.)"],
 ['IMPERVIOUS_SURFACE_SQFT_TRPA', 'DOUBLE', "Impervious Surface (Remote Sensing, sq.ft.)"],
 
 ['SOIL_1974_TRPA', 'TEXT','NRCS Soils 1974', 5],
@@ -196,7 +196,7 @@ trpaFields = [
 ["DESIGN_GUIDELINES_HYPERLINK_TRPA", "TEXT", "Design Guidelines", 255],
 ["LTINFO_HYPERLINK_TRPA", "TEXT", "LTinfo Parcel Details", 255],
 ["INDEX_1987_HYPERLINK_TRPA", "TEXT", "Index 1987 Hyperlink", 255],
-["STATU_TRPA",'TEXT',"Status",2],
+["STATUS_TRPA",'TEXT',"Status",1],
 # Fields for Parcel Size
 ["PARCEL_ACRES_TRPA", "DOUBLE", "Acres"],
 ["PARCEL_SQFT_TRPA", "DOUBLE", "Square Feet"] 
@@ -3475,15 +3475,24 @@ try:
             row[0] = row[1].getArea('PLANAR', 'SquareFeetUS')
             cursor.updateRow(row)
     del cursor
-
-    ### Estimated Percent Coverage Allowed Update---------------------------------------------------------------------###
-    percentCalc = (["ESTIMATED_COVERAGE_ALLOWED_TRPA"]/["PARCEL_SQFT_TRPA"])*100
-
-    with arcpy.da.UpdateCursor(ParcelLayer, ['ESTIMATED_PERCENT_COVERAGE_TRPA']) as cursor:
+    ### Set Status to Active--------------------------------------------------------------------------------------------------------###
+    with arcpy.da.UpdateCursor(ParcelLayer, ['STATUS_TRPA']) as cursor:
         for row in cursor:
-            row[0] = percentCalc
+            row[0] = 'A'
+            cursor.updateRow(row) 
+    del cursor
+    print("The 'STATUS_TRPA' field in the parcel data has been updated")
+    
+    ### Estimated Percent Coverage Allowed Update---------------------------------------------------------------------###
+    with arcpy.da.UpdateCursor(ParcelLayer, ['ESTIMATED_PRCNT_COV_ALLOWED_TRPA', "ESTIMATED_COVERAGE_ALLOWED_TRPA", "PARCEL_SQFT_TRPA"]) as cursor:
+        for row in cursor:
+            if not row[1] is None:
+                row[0] = (row[1] / row[2]) * 100
+            else:
+                row[0] = None
             cursor.updateRow(row) 
     del cursor  
+    print("The 'ESTIMATED_PRCNT_COV_ALLOWED_TRPA' field in the parcel data has been updated")
 
     ### IPES Score Update --------------------------------------------------------------------------------------------###
     # transfer attributes to Parcel Layer
@@ -3496,10 +3505,10 @@ try:
         for row in cursor:
             row[0] = 'A'
             cursor.updateRow(row) 
-    del cursor   
-
+    del cursor
+    print("The 'STATUS_TRPA' field in the parcel data has been updated")
+    
     ### Copy to Feature Class ----------------------------------------------------------------------------------------###
-    print("Copying memory features to staging: " + strftime("%Y-%m-%d %H:%M:%S"))
     # copy in-memory features to staging feature class
     arcpy.CopyFeatures_management(ParcelLayer, ParcelNew)
     print("Copied in-memory features, parcel staging new is set: " + strftime("%Y-%m-%d %H:%M:%S"))
@@ -3580,6 +3589,7 @@ try:
 # catch any arcpy errors
 except arcpy.ExecuteError:
     logger.error(arcpy.GetMessages())
+
     header = "ERROR - Arcpy Exception - Check Log"
     # send email with header based on try/except result
     send_mail(header)
