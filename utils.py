@@ -1,6 +1,6 @@
 import arcpy
 import pandas as pd
-
+import datetime
 
 ### Functions ###
 # time a function function
@@ -343,6 +343,18 @@ def get_text_fields(feature_class):
             field_list.append(field.name)
     return field_list
 
+def update_accela_date (feature_class,key_field,date_field,key_field_values):
+    # Get the current date
+    today_date = datetime.today()
+
+    # Update the date field based on the key field value
+    with arcpy.da.UpdateCursor(feature_class, [key_field, date_field]) as cursor:
+        for row in cursor:
+            if row[0] in key_field_values:
+                row[1] = today_date
+                cursor.updateRow(row)
+
+
 def update_parcel_layer(new_fc, old_fc_path, prefix_remove, data_type_mapping, fields_to_exclude, 
                         fields_to_ignore, special_parcels, difference_csv, db_connection, version_name_full):
     old_fc = 'Old_Feature_Class'
@@ -367,6 +379,9 @@ def update_parcel_layer(new_fc, old_fc_path, prefix_remove, data_type_mapping, f
 
     # get the differences as dictionaries (should this be a multikey?)
     differences_parcel = differenceDictionary(dfparcelOld, dfparcelNew, 'APN', fields_to_ignore)
+    difference_accela = differenceDictionary(dfparcelOld, dfparcelNew, 'APN', fields_to_ignore_accela)
+    difference_accela_apns = list(difference_accela.keys())
+    update_accela_date(old_fc,'APN','Major_Edit_Date',difference_accela_apns)
     dfDiff = pd.DataFrame(differences_parcel)
     dfDiff.to_csv(difference_csv)
     # Create a new version

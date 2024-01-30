@@ -34,6 +34,9 @@ prefix_remove = ('880','881','910','920','500', '510', '520', '530', '560', '570
 parcelNew = 'parcelNew'
 arcpy.MakeFeatureLayer_management("F:\GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb/Parcel_County_Staging", parcelNew)
 
+parcelNew_points = 'parcelNew_points'
+arcpy.MakeFeatureLayer_management("F:\GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb/Parcel_Points", parcelNew)
+
 #Define special parcels that need to be ignored
 df_special_parcels = pd.read_excel("F:\GIS/PARCELUPDATE/Workspace/special_parcels.xlsx")
 
@@ -68,6 +71,7 @@ arcpy.CreateDatabaseConnection_management(
 
 #Function parameters
 new_fc = parcelNew
+new_fc_points = parcelNew_points
 master_fc_path = r'SDE.Parcels\SDE.Parcel_Master'
 base_fc_path = r'SDE.Parcels\SDE.Parcels_Base'
 points_fc_path = r'SDE.Parcels\SDE.ParcelPoints'
@@ -100,7 +104,7 @@ utils.update_parcel_layer(parcelNew, master_fc_path,prefix_remove, data_type_map
 utils.update_parcel_layer(parcelNew, base_fc_path,prefix_remove, data_type_mapping, fields_to_exclude_base, fields_to_ignore_base,
                           df_special_parcels,base_difference_csv, database_connection, version_name_full)
 #Update Parcel Points
-utils.update_parcel_layer(parcelNew, points_fc_path,prefix_remove, data_type_mapping, fields_to_exclude_points, fields_to_ignore_points,
+utils.update_parcel_layer(parcelNew_points, points_fc_path,prefix_remove, data_type_mapping, fields_to_exclude_points, fields_to_ignore_points,
                           df_special_parcels,points_difference_csv, database_connection, version_name_full)
 
 
