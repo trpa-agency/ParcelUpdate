@@ -16,21 +16,23 @@ The load process moves the new geometries and attributes from the staged parcel 
 ## Current Enchancements
 * Created a way to load a WKT dictionary as form data to LTinfo
 * Updated the scripts metadata and structure
-  
-## Future Enhancements
 * Add Status field and make it 1 character long string always set to A
-* Remove Littoral field from schema. Littoral defintion is not being met by spatial means. 
+* Remove Littoral field from schema. Littoral defintion is not being met by spatial means.
+* 
+## Future Enhancements
+* Parcel_Master schema additions: Deed Restriction field as concatenated list. Add back in BMP_Status, add LCV Verified vs Estimated, and Verified Coverage Allowed, Verified % Coverage Allowed, VHR, Active_Permit, AccelaModDate
+* Parcel_Point update in Transform and Load scripts
+* Fix way LTinfo is getting Geometry from WKT_Export.py
+* Create update of Parcel_County_Staging in Collection.sde using Load script
 * Improve script metadata, error handling, and logging
 * Create an automated way via email to notify staff of new and obsolete parcels
 * Add QA/QC script
-* Update Address table for BMP load
 * Integrate verified address field
 * Save copy of September update to yearly folder structure
 * Script Parcel History based on september data
-* Script Parcel Point update
+* Script Parcel Point update in Transform and Load script
+* Update Parcel Point schema to mirror Parcel_Master
+* Script Parcel_Development_History updates. TAX_SUM, CFA, RES, TAU, data engineering.
 * Script Parcel History Polygon data append using September data
 * Notify TRCD and CTC of parcel update and stand up shared update layer of expanded parcel (Olympic Valley AOI) data or them to pull
-## Other
-### Deed Restriction update
 
-### Parcel Permit Transformation and Load
