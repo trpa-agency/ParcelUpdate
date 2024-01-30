@@ -18,7 +18,8 @@ The load process moves the new geometries and attributes from the staged parcel 
 * Updated the scripts metadata and structure
 * Add Status field and make it 1 character long string always set to A
 * Remove Littoral field from schema. Littoral defintion is not being met by spatial means.
-* 
+* Added IPES and Estimated % Coverage Allowed to the Parcel_Master schema
+  
 ## Future Enhancements
 * Parcel_Master schema additions: Deed Restriction field as concatenated list. Add back in BMP_Status, add LCV Verified vs Estimated, and Verified Coverage Allowed, Verified % Coverage Allowed, VHR, Active_Permit, AccelaModDate
 * Parcel_Point update in Transform and Load scripts
