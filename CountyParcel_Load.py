@@ -20,6 +20,12 @@ workspace = "F:\GIS/PARCELUPDATE/Workspace/Staging"
 inWorkspace = "F:\GIS\PARCELUPDATE\Workspace\Vector.sde"
 arcpy.env.workspace = inWorkspace
 
+#Make parcel points
+arcpy.management.FeatureToPoint(
+    in_features="Parcel_County_Staging",
+    out_feature_class=r"F:\GIS\PARCELUPDATE\Workspace\ParcelStaging.gdb\Parcel_Points",
+    point_location="INSIDE"
+)
 
 # prefixes to remove...these we keep or ignore
 prefix_remove = ('880','881','910','920','500', '510', '520', '530', '560', '570', '580', '590', '600', '700','800','900')
@@ -65,7 +71,18 @@ new_fc = parcelNew
 master_fc_path = r'SDE.Parcels\SDE.Parcel_Master'
 base_fc_path = r'SDE.Parcels\SDE.Parcels_Base'
 points_fc_path = r'SDE.Parcels\SDE.ParcelPoints'
-
+fields_to_exclude_master = ['SHAPE','OBJECTID', 'Shape']
+fields_to_exclude_base = ['SHAPE']
+fields_to_exclude_points = ['SHAPE', 'OBJECTID', 'Shape']
+fields_to_ignore_master = ['PARCEL_SQFT', 'PPNO', 'ESTIMATED_COVERAGE_ALLOWED', 'IMPERVIOUS_SURFACE_SQFT', 
+                    'LOCATION_TO_TOWNCENTER', 'UNITS', 'PARCEL_ACRES','YEAR_BUILT', 'BEDROOMS',
+                   'BUILDING_SQFT', 'BATHROOMS']
+fields_to_ignore_base = ['Shape', 'PARCEL_ACRES', 'PARCEL_SQFT', 'OBJECTID']
+fields_to_ignore_points = ['Shape', 'PARCEL_ACRES', 'PARCEL_SQFT', 'OBJECTID']
+master_difference_csv = "Differences_List.csv"
+base_difference_csv = "Differences_List_Base.csv"
+points_difference_csv = "Differences_List_Points.csv"
+database_connection = 'db_connections/ConnectionFile.sde'
 
 data_type_mapping = {
     "String": str,
@@ -76,7 +93,15 @@ data_type_mapping = {
     "Date": pd.to_datetime
 }
 
-utils.update_parcel_layer
+#Update parcel master
+utils.update_parcel_layer(parcelNew, master_fc_path,prefix_remove, data_type_mapping, fields_to_exclude_master, fields_to_ignore_master,
+                          df_special_parcels,master_difference_csv, database_connection, version_name_full)
+#Update Parcel Base
+utils.update_parcel_layer(parcelNew, base_fc_path,prefix_remove, data_type_mapping, fields_to_exclude_base, fields_to_ignore_base,
+                          df_special_parcels,base_difference_csv, database_connection, version_name_full)
+#Update Parcel Points
+utils.update_parcel_layer(parcelNew, points_fc_path,prefix_remove, data_type_mapping, fields_to_exclude_points, fields_to_ignore_points,
+                          df_special_parcels,points_difference_csv, database_connection, version_name_full)
 
 
 #We need to create a connection to Base
@@ -104,7 +129,7 @@ arcpy.CreateDatabaseConnection_management(
 
 filepath = "F:\GIS/PARCELUPDATE/Workspace/Parcel_Old_New/"
 parcel_list_name = "Parcel_Old_New" + strftime("%Y-%m-%d")+".csv"
-df_parcel_changes.to_csv(filepath+parcel_list_name, index=False)
+utils.df_parcel_changes.to_csv(filepath+parcel_list_name, index=False)
 
 inWorkspace = 'db_connections/ConnectionFile_Tabular.sde'
 arcpy.env.workspace = inWorkspace
