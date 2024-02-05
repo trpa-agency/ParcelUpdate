@@ -87,6 +87,10 @@ sde_Tolerance        = sdeBase + "\\sde.SDE.Shorezone\\sde.SDE.Tolerance_Distric
 
 # sde Collect feature classes to use for attribution
 sde_collect_IPES     = os.path.join(sdeCollect, 'SDE.Parcel\SDE.Parcel_LTinfo_IPES')
+sde_collect_LCV      = os.path.join(sdeCollect, 'SDE.Parcel\SDE.Parcel_LTinfo_LCV')
+sde_collect_BMP      = os.path.join(sdeCollect, 'SDE.Parcel\SDE.Parcel_BMP')
+sde_collect_Deed     = os.path.join(sdeCollect, 'SDE.Parcel\SDE.Parcel_LTinfo_Deed_Restriction')  
+sde_collect_VHR      = os.path.join(sdeCollect, 'SDE.Parcel\SDE.Parcel_VHR')
 
 # in memory fcs to use in the attribution stage
 memory = "memory" + "\\"

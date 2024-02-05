@@ -2,8 +2,7 @@
 ParcelTables_to_ParcelFeatures.py
 Created: March 13th, 2020
 Last Updated: June 14th, 2023
-Mason Bindl, Tahoe Regional Planning Agency
-Amy Fish, Tahoe Regional Planning Agency
+Tahoe Regional Planning Agency
 
 This python script was developed to move data from 
 Accela, LTinfo, and BMP databases to TRPA's dynamic Enterprise Geodatabase.
