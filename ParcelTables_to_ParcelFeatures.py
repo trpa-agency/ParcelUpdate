@@ -1,9 +1,9 @@
 """
 ParcelTables_to_ParcelFeatures.py
 Created: March 13th, 2020
-Last Updated: June 14th, 2023
-Mason Bindl, Tahoe Regional Planning Agency
-Amy Fish, Tahoe Regional Planning Agency
+Last Updated: February 4th, 2024
+Tahoe Regional Planning Agency
+GIS Team, gis@trpa.gov
 
 This python script was developed to move data from 
 Accela, LTinfo, and BMP databases to TRPA's dynamic Enterprise Geodatabase.
@@ -63,10 +63,23 @@ sdeString  = fdata + "\\sde_collection.SDE."
 # local path to stage csvs in
 accelaFiles = "//trpa-fs01/GIS/Acella/Reports"
 
+# Get database user and password from environment variables
+db_user     = os.environ.get('DB_USER')
+db_password = os.environ.get('DB_PASSWORD')
+driver      = 'ODBC Driver 17 for SQL Server'
+database    = 'sde_tabular'
+server      = 'sql12'
+
 # connect to bmp SQL dataabase
-connection_string = "DRIVER={ODBC Driver 17 for SQL Server};SERVER=sql14;DATABASE=tahoebmpsde;UID=sde;PWD=staff"
+BMP_connection_string = "DRIVER={ODBC Driver 17 for SQL Server};SERVER=sql14;DATABASE=tahoebmpsde;UID=sde;PWD=staff"
+BMP_connection_url = URL.create("mssql+pyodbc", query={"odbc_connect": BMP_connection_string})
+BMP_engine = create_engine(BMP_connection_url)
+
+
+# connect to bmp SQL dataabase
+connection_string = f"DRIVER={driver};SERVER={server};DATABASE={database};UID={db_user};PWD={db_password}"
 connection_url = URL.create("mssql+pyodbc", query={"odbc_connect": connection_string})
-engine = create_engine(connection_url)
+Tab_engine = create_engine(connection_url)
 
 # Box API credentialsn setup with CCGAuth
 auth = CCGAuth(
@@ -82,7 +95,7 @@ client = Client(auth)
 ##--------------------------------------------------------------------------------------#
 ## LOGGING SETUP
 # Configure the logging
-log_file_path = os.path.join(working_folder, "Parcel_Tables_to_Features_Log.log")  
+log_file_path = os.path.join(working_folder, "Logs\Parcel_Tables_to_Features.log")  
 # setup basic logging configuration
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -141,30 +154,22 @@ def updateStagingLayer(name, df, fields):
     print(f"\nUpdated staging layer:{outFC}")
     logger.info(f"\nUpdated staging layer:{outFC}")
 
-# replaces table in sde_tabular
-def updateSDETabularTable(tables):
-    for table in tables:
-        inputTbl = os.path.join(workspace, table)
-        dsc = arcpy.Describe(inputFC)
-        fields = dsc.fields
-        out_fields = [dsc.OIDFieldName, dsc.lengthFieldName, dsc.areaFieldName]
-        fieldnames = [field.name if field.name != 'Shape' else 'SHAPE@' for field in fields if field.name not in out_fields]
-        outTbl = sdeTbl + table
-        # deletes all rows from the SDE feature class
-        arcpy.TruncateTable_management(table)
-        logger.info("\nDeleted all records in: {}\n".format(table))
-        from time import strftime  
-        logger.info("Started data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
-        # insert rows from Temporary feature class to SDE feature class
-        with arcpy.da.InsertCursor(table, fieldnames) as oCursor:
-            count = 0
-            with arcpy.da.SearchCursor(inputTbl, fieldnames) as iCursor:
-                for row in iCursor:
-                    oCursor.insertRow(row)
-                    count += 1
-                    if count % 100 == 0:
-                        logger.info("Inserting record %d into %s SDE feature class" % (count, outTbl))
-                logger.info(f"\nDone updating: {outTbl}")
+# Execute a query
+def insert_into_sql(df, table, chunksize=1000):
+    # add ObjectId column to the dataframe
+    if 'OBJECTID' not in df.columns:
+        df['OBJECTID'] = range(1, len(df) + 1)
+    # create a connection to the database
+    conn = Tab_engine.connect()
+    # delete the existing rows from the table
+    conn.execute(f"DELETE FROM {table}")
+    # insert the rows into the table in chunks
+    df.to_sql(table, conn, if_exists='append', index=False, chunksize=chunksize)
+    # log the number of rows inserted
+    logger.info(f"{len(df)} rows inserted into {table} table")
+    # close the connection
+    conn.close()
+
             
 # replaces features in outfc with exact same schema
 def updateSDECollectFC(fcList):
@@ -207,17 +212,22 @@ def getAccelaBOXfiles(fileDict):
             logger.info(f'Error downloading file. File not found.')
 
 # get the bigger accela report data via the API ESA setup on LTinfo
-def getAccelaLTinfoFiles(csvDict):
-    for csvName,api_url in csvDict.items():
+def getAccelaLTinfoFiles(xlsDict):
+    for xlsName,api_url in xlsDict.items():
         # Send a GET request to the API
         response = requests.get(api_url)
         if response.status_code == 200:
             # If the request is successful, save the CSV content to a file
-            with open(os.path.join(accelaFiles,csvName), "wb") as csv_file:
-                csv_file.write(response.content)
-            logger.info(f"CSV file saved as {csvName}")
+            with open(os.path.join(accelaFiles,xlsName), "wb") as xls_file:
+                xls_file.write(response.content)
+            logger.info(f"Excel file saved as {xlsName}")
         else:
             logger.info(f"Failed to fetch data from the API. Status code: {response.status_code}")
+
+# replace the spaces in the column names with underscores
+def clean_column_names(df):
+    df.columns = df.columns.str.replace(" ", "_")
+    return df
 
 #---------------------------------------------------------------------------------------#
 ## GET DATA
@@ -227,21 +237,10 @@ def getAccelaLTinfoFiles(csvDict):
 startTimer = datetime.datetime.now()
 
 # dictionary of acella reports from ltinfo (check with ESA for updates or issues to their API)
-ltinfoDict = {'Accela_Parcels.csv'         : 'https://laketahoeinfo.org/Api/GetAccelaParcelsExcel/1A77D078-B83E-44E0-8CA5-8D7429E1A6B4',
-              'Accela_Record_Details.csv'  : 'https://laketahoeinfo.org/Api/GetAccelaRecordDetailsExcel/1A77D078-B83E-44E0-8CA5-8D7429E1A6B4',
-              'Accela_Record_Documents.csv': 'https://laketahoeinfo.org/Api/GetAccelaRecordDocumentsExcel/1A77D078-B83E-44E0-8CA5-8D7429E1A6B4'
+ltinfoDict = {'Accela_Parcels.xlsx'         : 'https://laketahoeinfo.org/Api/GetAccelaParcelsExcel/1A77D078-B83E-44E0-8CA5-8D7429E1A6B4',
+              'Accela_Record_Details.xlsx'  : 'https://laketahoeinfo.org/Api/GetAccelaRecordDetailsExcel/1A77D078-B83E-44E0-8CA5-8D7429E1A6B4',
+            #   'Accela_Record_Documents.csv': 'https://laketahoeinfo.org/Api/GetAccelaRecordDocumentsExcel/1A77D078-B83E-44E0-8CA5-8D7429E1A6B4'
              }
-
-# function to save Accela Reports from LTinfo API
-getAccelaLTinfoFiles(ltinfoDict)
-
-# make dataframes from exported accela views
-
-dfAParcel  = pd.read_excel(os.path.join(accelaFiles, 'Accela_Parcels.csv'))
-dfAPermit  = pd.read_excel(os.path.join(accelaFiles, 'Accela_Record_Details.csv'))
-
-# # function to save Accela Reports from LTinfo API
-# getAccelaLTinfoFiles(ltinfoDict, accelaFiles, logger)
 
 # dictionary of csv name and box file ID
 boxDict = {'Land_Capable_Verifications.csv': "1342591986420",
@@ -250,6 +249,9 @@ boxDict = {'Land_Capable_Verifications.csv': "1342591986420",
            'Grading_Exception_Map.csv'      : "1337039879890",
            'Historic_Designations.csv'     : "1342590117002"
            }
+
+# function to save Accela Reports from LTinfo API
+getAccelaLTinfoFiles(ltinfoDict)
 
 # function to save Accela Reports from Box
 getAccelaBOXfiles(boxDict)
@@ -263,10 +265,10 @@ dfGrade    = pd.read_csv(os.path.join(accelaFiles, 'Grading_Exception_Map.csv'))
 # dfSecurity = pd.read_csv(os.path.join(accelaFiles, 'Accela_Security.csv'))
 dfAParcel  = pd.read_excel(os.path.join(accelaFiles, 'Accela_Parcels.xlsx'))
 dfAPermit  = pd.read_excel(os.path.join(accelaFiles, 'Accela_Record_Details.xlsx'))
-dfADoc     = pd.read_csv(os.path.join(accelaFiles, 'Accela_Record_Documents.xlsx'))
+# dfADoc     = pd.read_csv(os.path.join(accelaFiles, 'Accela_Record_Documents.xlsx'))
 
 # get BMP Status data as dataframe from BMP SQL Database
-with engine.begin() as bmpConnect:
+with BMP_engine.begin() as bmpConnect:
     dfBMP      = pd.read_sql("SELECT * FROM tahoebmpsde.dbo.v_BMPStatus", bmpConnect)
 
 # LTInfo - create dataframes from JSON found here: https://laketahoeinfo.org/WebServices/List
@@ -749,6 +751,16 @@ try:
     updateSDECollectFC(fcs)
 
     #---------------------------------------------------------------------------------------#
+
+    # clean the column names
+    dfAParcel = clean_column_names(dfAParcel)
+    dfAPermit = clean_column_names(dfAPermit)
+
+    # # insert the dataframes into the SQL database
+    insert_into_sql(dfAParcel, "SDE.Accela_Parcels")
+    insert_into_sql(dfAPermit, "SDE.Accela_Record_Details")
+    #---------------------------------------------------------------------------------------#
+    
     # report how long it took to get the data
     endTimer = datetime.datetime.now() - startTimer 
     logger.info(f"\nTime it took to update Collection SDE feature classes: {endTimer}") 
