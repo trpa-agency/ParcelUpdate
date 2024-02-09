@@ -63,10 +63,23 @@ sdeString  = fdata + "\\sde_collection.SDE."
 # local path to stage csvs in
 accelaFiles = "//trpa-fs01/GIS/Acella/Reports"
 
+# Get database user and password from environment variables
+db_user     = os.environ.get('DB_USER')
+db_password = os.environ.get('DB_PASSWORD')
+driver      = 'ODBC Driver 17 for SQL Server'
+database    = 'sde_tabular'
+server      = 'sql12'
+
 # connect to bmp SQL dataabase
-connection_string = "DRIVER={ODBC Driver 17 for SQL Server};SERVER=sql14;DATABASE=tahoebmpsde;UID=sde;PWD=staff"
+BMP_connection_string = "DRIVER={ODBC Driver 17 for SQL Server};SERVER=sql14;DATABASE=tahoebmpsde;UID=sde;PWD=staff"
+BMP_connection_url = URL.create("mssql+pyodbc", query={"odbc_connect": BMP_connection_string})
+BMP_engine = create_engine(BMP_connection_url)
+
+
+# connect to bmp SQL dataabase
+connection_string = f"DRIVER={driver};SERVER={server};DATABASE={database};UID={db_user};PWD={db_password}"
 connection_url = URL.create("mssql+pyodbc", query={"odbc_connect": connection_string})
-engine = create_engine(connection_url)
+Tab_engine = create_engine(connection_url)
 
 # Box API credentialsn setup with CCGAuth
 auth = CCGAuth(
@@ -141,26 +154,21 @@ def updateStagingLayer(name, df, fields):
     print(f"\nUpdated staging layer:{outFC}")
     logger.info(f"\nUpdated staging layer:{outFC}")
 
-# replaces table in sde_tabular
-def updateSDETabularTable(tables):
-    for table in tables:
-        # input table
-        inputTable = os.path.join(accelaFiles, table)
-        # output table
-        outTable = os.path.join(sdeTabular,table)
-        # deletes all rows from the SDE table
-        arcpy.TruncateTable_management(outTable)
-        logger.info("\nDeleted all records in: {}\n".format(outTable))
-        # insert rows from Temporary table to SDE table
-        with arcpy.da.InsertCursor(outTable, "*") as oCursor:
-            count = 0
-            with arcpy.da.SearchCursor(inputTable, "*") as iCursor:
-                for row in iCursor:
-                    oCursor.insertRow(row)
-                    count += 1
-                    if count % 100 == 0:
-                        logger.info("Inserting record %d into %s SDE table" % (count, outTable))
-                logger.info(f"\nDone updating: {outTable}")
+# Execute a query
+def insert_into_sql(df, table, chunksize=1000):
+    # add ObjectId column to the dataframe
+    if 'OBJECTID' not in df.columns:
+        df['OBJECTID'] = range(1, len(df) + 1)
+    # create a connection to the database
+    conn = Tab_engine.connect()
+    # delete the existing rows from the table
+    conn.execute(f"DELETE FROM {table}")
+    # insert the rows into the table in chunks
+    df.to_sql(table, conn, if_exists='append', index=False, chunksize=chunksize)
+    # log the number of rows inserted
+    logger.info(f"{len(df)} rows inserted into {table} table")
+    # close the connection
+    conn.close()
 
             
 # replaces features in outfc with exact same schema
@@ -216,6 +224,11 @@ def getAccelaLTinfoFiles(xlsDict):
         else:
             logger.info(f"Failed to fetch data from the API. Status code: {response.status_code}")
 
+# replace the spaces in the column names with underscores
+def clean_column_names(df):
+    df.columns = df.columns.str.replace(" ", "_")
+    return df
+
 #---------------------------------------------------------------------------------------#
 ## GET DATA
 #---------------------------------------------------------------------------------------#
@@ -255,7 +268,7 @@ dfAPermit  = pd.read_excel(os.path.join(accelaFiles, 'Accela_Record_Details.xlsx
 # dfADoc     = pd.read_csv(os.path.join(accelaFiles, 'Accela_Record_Documents.xlsx'))
 
 # get BMP Status data as dataframe from BMP SQL Database
-with engine.begin() as bmpConnect:
+with BMP_engine.begin() as bmpConnect:
     dfBMP      = pd.read_sql("SELECT * FROM tahoebmpsde.dbo.v_BMPStatus", bmpConnect)
 
 # LTInfo - create dataframes from JSON found here: https://laketahoeinfo.org/WebServices/List
@@ -739,12 +752,13 @@ try:
 
     #---------------------------------------------------------------------------------------#
 
-    # table list
-    tables = ["Accela_Parcels", "Accela_Record_Details"]
+    # clean the column names
+    dfAParcel = clean_column_names(dfAParcel)
+    dfAPermit = clean_column_names(dfAPermit)
 
-    # function to update all tabular SDE tables in list
-    updateSDETabularTable(tables)
-
+    # # insert the dataframes into the SQL database
+    insert_into_sql(dfAParcel, "SDE.Accela_Parcels")
+    insert_into_sql(dfAPermit, "SDE.Accela_Record_Details")
     #---------------------------------------------------------------------------------------#
     
     # report how long it took to get the data
