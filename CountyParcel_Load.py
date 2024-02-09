@@ -6,7 +6,7 @@ from time import strftime
 import utils
 
 # environment settings
-arcpy.env.workspace = "F:\GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb"
+arcpy.env.workspace = "F:/GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb"
 arcpy.env.overwriteOutput = True
 arcpy.env.outputCoordinateSystem = arcpy.SpatialReference(26910)
 
@@ -14,7 +14,7 @@ arcpy.env.outputCoordinateSystem = arcpy.SpatialReference(26910)
 #script_directory = os.path.dirname(os.path.abspath(__file__))
 
 # set workspace and sde connections 
-workspace = "F:\GIS/PARCELUPDATE/Workspace/Staging"
+workspace = "F:/GIS/PARCELUPDATE/Workspace/Staging"
 
 #Create database connection
 inWorkspace = "F:\GIS\PARCELUPDATE\Workspace\Vector.sde"
@@ -22,7 +22,7 @@ arcpy.env.workspace = inWorkspace
 
 #Make parcel points
 arcpy.management.FeatureToPoint(
-    in_features="Parcel_County_Staging",
+    in_features=r"F:\GIS\PARCELUPDATE\Workspace\ParcelStaging.gdb\Parcel_County_Staging",
     out_feature_class=r"F:\GIS\PARCELUPDATE\Workspace\ParcelStaging.gdb\Parcel_Points",
     point_location="INSIDE"
 )
@@ -45,6 +45,17 @@ df_special_parcels = pd.read_excel("F:\GIS/PARCELUPDATE/Workspace/special_parcel
 new_version_name = "Parcel_Update_" + strftime("%Y-%m-%d")
 parent_version = "SDE.DEFAULT"
 version_name_full = "SDE." + new_version_name
+version_list = arcpy.da.ListVersions(inWorkspace)
+version_exists = False
+
+for version in version_list:
+    if version.name == version_name_full:
+        version_exists = True
+        break
+
+if version_exists:
+    # Delete the version
+    arcpy.management.DeleteVersion(inWorkspace, version_name_full)
 
 # Create a new version
 arcpy.CreateVersion_management(inWorkspace, parent_version, new_version_name, "PUBLIC")

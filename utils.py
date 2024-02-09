@@ -2,6 +2,8 @@ import arcpy
 import pandas as pd
 import datetime
 from time import strftime
+import time
+from arcgis.features import GeoAccessor
 ### Functions ###
 # time a function function
 ## use as decorator @timer
@@ -157,6 +159,7 @@ def update_fc_from_dict(update_dict,key_field, fc,edit_session):
                     for field, value in update_values.items():
                         index = cursor.fields.index(field)
                         row[index] = value
+                        print(field)
                     edit_session.startOperation()
                     cursor.updateRow(row)
                     edit_session.stopOperation()
@@ -379,9 +382,9 @@ def update_parcel_layer(new_fc, old_fc_path, prefix_remove, data_type_mapping, f
 
     # get the differences as dictionaries (should this be a multikey?)
     differences_parcel = differenceDictionary(dfparcelOld, dfparcelNew, 'APN', fields_to_ignore)
-    difference_accela = differenceDictionary(dfparcelOld, dfparcelNew, 'APN', fields_to_ignore_accela)
-    difference_accela_apns = list(difference_accela.keys())
-    update_accela_date(old_fc,'APN','Major_Edit_Date',difference_accela_apns)
+    #difference_accela = differenceDictionary(dfparcelOld, dfparcelNew, 'APN', fields_to_ignore_accela)
+    #difference_accela_apns = list(difference_accela.keys())
+    #update_accela_date(old_fc,'APN','Major_Edit_Date',difference_accela_apns)
     dfDiff = pd.DataFrame(differences_parcel)
     dfDiff.to_csv(difference_csv)
     # Create a new version
@@ -394,7 +397,7 @@ def update_parcel_layer(new_fc, old_fc_path, prefix_remove, data_type_mapping, f
     #try:
         # Start an edit operation
     #edit.startOperation()
-    apn_issues = update_fc_from_dict(differences_parcel, 'APN', old_fc,edit)
+    apn_issues = update_fc_from_dict(differences_parcel, 'APN', old_fc, edit)
     if len(apn_issues)==0:
         print ("No issues with executing updates")
     else:
