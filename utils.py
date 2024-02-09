@@ -1,7 +1,7 @@
 import arcpy
 import pandas as pd
 import datetime
-
+from time import strftime
 ### Functions ###
 # time a function function
 ## use as decorator @timer
