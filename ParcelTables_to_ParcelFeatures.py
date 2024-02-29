@@ -64,24 +64,25 @@ sdeString  = fdata + "\\sde_collection.SDE."
 accelaFiles = "//trpa-fs01/GIS/Acella/Reports"
 
 # Get database user and password from environment variables
-db_user     = os.environ.get('DB_USER')
-db_password = os.environ.get('DB_PASSWORD')
-driver      = 'ODBC Driver 17 for SQL Server'
-database    = 'sde_tabular'
-server      = 'sql12'
+db_user             = os.environ.get('DB_USER')
+db_password         = os.environ.get('DB_PASSWORD')
+driver              = 'ODBC Driver 17 for SQL Server'
+tabular_database    = 'sde_tabular'
+serverSQL12         = 'sql12'
+bmp_database        = 'tahoebmpsde'
+serverSQL14         = 'sql14'
 
-# connect to bmp SQL dataabase
-BMP_connection_string = "DRIVER={ODBC Driver 17 for SQL Server};SERVER=sql14;DATABASE=tahoebmpsde;UID=sde;PWD=staff"
+# connect to BMP SQL dataabase
+BMP_connection_string = f"DRIVER={driver};SERVER={serverSQL14};DATABASE={bmp_database};UID={db_user};PWD={db_password}"
 BMP_connection_url = URL.create("mssql+pyodbc", query={"odbc_connect": BMP_connection_string})
 BMP_engine = create_engine(BMP_connection_url)
 
-
-# connect to bmp SQL dataabase
-connection_string = f"DRIVER={driver};SERVER={server};DATABASE={database};UID={db_user};PWD={db_password}"
+# connect to Tabular SQL dataabase
+connection_string = f"DRIVER={driver};SERVER={serverSQL12};DATABASE={tabular_database};UID={db_user};PWD={db_password}"
 connection_url = URL.create("mssql+pyodbc", query={"odbc_connect": connection_string})
 Tab_engine = create_engine(connection_url)
 
-# Box API credentialsn setup with CCGAuth
+# Box API credentials setup with CCGAuth
 auth = CCGAuth(
   client_id     = "pusxamhqx4urav2lj847darrr1niydzp",
   client_secret = "tmnxqxp8sSY6i24OPX2bAYFrnIA3cerZ",
@@ -164,7 +165,7 @@ def insert_into_sql(df, table, chunksize=1000):
     # delete the existing rows from the table
     conn.execute(f"DELETE FROM {table}")
     # insert the rows into the table in chunks
-    df.to_sql(table, conn, if_exists='append', index=False, chunksize=chunksize)
+    df.to_sql(table, conn, if_exists='append', index=False, schema= 'dbo',chunksize=chunksize)
     # log the number of rows inserted
     logger.info(f"{len(df)} rows inserted into {table} table")
     # close the connection
@@ -331,6 +332,7 @@ try:
             'ParcelStreet',
             'CreditPercent',
             'AreaWide',
+            'AreaWidePlanName',
             'CreditArea',
             'Rvkd',
             'TMDL_LandUse',
@@ -757,8 +759,8 @@ try:
     dfAPermit = clean_column_names(dfAPermit)
 
     # # insert the dataframes into the SQL database
-    insert_into_sql(dfAParcel, "SDE.Accela_Parcels")
-    insert_into_sql(dfAPermit, "SDE.Accela_Record_Details")
+    insert_into_sql(dfAParcel, "Accela_Parcels")
+    insert_into_sql(dfAPermit, "Accela_Record_Details")
     #---------------------------------------------------------------------------------------#
     
     # report how long it took to get the data
