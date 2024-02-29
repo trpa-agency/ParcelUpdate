@@ -332,6 +332,7 @@ try:
             'ParcelStreet',
             'CreditPercent',
             'AreaWide',
+            'AreaWidePlanName',
             'CreditArea',
             'Rvkd',
             'TMDL_LandUse',
