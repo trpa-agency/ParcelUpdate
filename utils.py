@@ -387,6 +387,21 @@ def update_parcel_layer(new_fc, old_fc_path, prefix_remove, data_type_mapping, f
     #update_accela_date(old_fc,'APN','Major_Edit_Date',difference_accela_apns)
     dfDiff = pd.DataFrame(differences_parcel)
     dfDiff.to_csv(difference_csv)
+    acella_fields = ['HSE_NUMBR', 'UNIT_NUMBR', 'STR_DIR', 'STR_NAME', 'STR_SUFFIX', 
+                     'APO_ADDRESS', 'PSTL_TOWN', 'PSTL_STATE', 'PSTL_ZIP5', 'OWN_FIRST', 
+                     'OWN_LAST', 'OWN_FULL', 'MAIL_ADD1', 'MAIL_ADD2', 'MAIL_CITY', 'MAIL_STATE', 
+                     'MAIL_ZIP5', 'JURISDICTION', 'COUNTY', 'OWNERSHIP_TYPE', 'COUNTY_LANDUSE_CODE', 
+                     'COUNTY_LANDUSE_DESCRIPTION', 'IPES_SCORE', 'HRA_NAME', 'WATERSHED_NUMBER', 'WATERSHED_NAME', 
+                     'PRIORITY_WATERSHED', 'FIREPD', 'WITHIN_TRPA_BNDY' 
+]
+    #List fields of dfparcelnew
+    acella_fields_exclude = []
+    for field in dfparcelNew.columns:
+        if field not in acella_fields:
+            acella_fields_exclude.append(field)
+    differences_acella = differenceDictionary(dfparcelOld, dfparcelNew, 'APN', acella_fields_exclude)
+    dfdiff_acella = pd.DataFrame(differences_acella)
+    dfdiff_acella.to_csv('Differences_Acella.csv')
     # Create a new version
     #arcpy.CreateVersion_management(inWorkspace, parent_version, new_version_name, "PUBLIC")
     arcpy.ChangeVersion_management(old_fc,'TRANSACTIONAL', version_name_full, '')
