@@ -5,10 +5,10 @@ Purpose: Update the Parcel_History layer in the SDE databse
 required for the Parcel History layer in the GIS database.  This script will
 be run annually to update the Parcel History table with the new parcels and
 inactive parcels.  
-Requirements: The script requires the following layers and folder locations:
+Requirements: The script requires the following labuild_years_activeyers and folder locations:
 1. Parcel Master - The master parcel layer
 2. Parcel History - The parcel history layer
-3. C:\\temp\\gis\\Workspace.gdb - The workspace geodatabase
+3. C:\\temp\\gis\\Workspacbuild_years_activee.gdb - The workspace geodatabase
 4. c:\\temp
 
 Author: Amy Fish
@@ -17,7 +17,7 @@ Version: 1.0
 
 TODO: 1. Add the ability to email the results of the script
       2. Add the ability to create a new version in the SDE database
-      3. Update PPNO and County fields
+      3. Update PPNO or remove PPNO from data
 """
 import arcpy
 
@@ -388,6 +388,7 @@ def update_attributes():
                 print(str(history_county) + " / " + str(master_county))
                 updateRow[3] = master_county
                 updateRows.updateRow(updateRow)
+        
         # Stop the edit session
         edit.stopEditing(True)
         print("Stopped edit session")
@@ -446,18 +447,15 @@ def build_years_active():
         edit = arcpy.da.Editor(arcpy.env.workspace)
         edit.startEditing()
         edit.startOperation()
-
         with arcpy.da.UpdateCursor(parcel_history, ["APN", "b2023Active", "Years_Active"]) as cursor:
             for row in cursor:
                 years_active = ""
-                if row[1] == 1: #2023 Active
+                if str(row[1]) == "1": #2023 Active
                     if row[2] == "":
                         years_active = "2023"
                     else:
                         years_active = "2023," + str(row[2])
-                        print("Years Active: " + years_active)
-                        i += 1
-
+                        
                     if years_active != row[2]:
                         row[2] = years_active
                         cursor.updateRow(row)
