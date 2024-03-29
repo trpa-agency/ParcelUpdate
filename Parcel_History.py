@@ -39,8 +39,9 @@ receiver_email = "afish@trpa.gov"
 database_connection = "C:\\Users\\afish\\AppData\\Roaming\\Esri\\ArcGISPro\\Favorites\\SDE (SDE user).sde"
 
 # Define the existing layers
-feature_class_name = "\\SDE.Parcels\\SDE.Parcel_History"
 Parcel_Poly_2023 = "C:\\temp\\gis\\workspace.gdb\\Parcels2023"
+parcel_history = database_connection + "\\SDE.Parcels\\SDE.Parcel_History"
+parcel_master = database_connection + "\\SDE.Parcels\\SDE.Parcel_Master"
 
 # Define the output layers
 Parcels_toPoint = "c:\\temp\\gis\\Workspace.gdb\\Parcels_toPoint_2023"
@@ -68,8 +69,6 @@ arcpy.management.FeatureToPoint(in_features=Parcel_Poly_2023, out_feature_class=
 
 # Replace these variables with your actual values
 input_layer = Parcels_toPoint
-parcel_history = database_connection + feature_class_name
-parcel_master = database_connection + "\\SDE.Parcels\\SDE.Parcel_Master"
 
 # send email with attachments
 def send_mail(body):
@@ -328,9 +327,9 @@ def find_obsolete_records(input_layer, target_layer, join_field):
                         print(f"Updating parcel {apn_key} to inactive.")
                         cursor.updateRow(row)        
                     
-        # Stop the edit session
-        edit.stopEditing(True)
-        print("Stopped edit session")            
+            # Stop the edit session
+            edit.stopEditing(True)
+            print("Stopped edit session")            
 
     except arcpy.ExecuteError:
         print(arcpy.GetMessages(2))
@@ -515,7 +514,7 @@ def update_current_apn():
                 old_all_apns_string = str(row[2])
                 with arcpy.da.SearchCursor(currentapns_join, ["APN_1"], "APN = '" + apn + "'", sql_clause=(None, "ORDER BY APN_1 ASC")) as cur:
                     for r in cur:
-                        #new_currentapn_string = str(r[0])
+                        new_currentapn_string = str(r[0])
                         if str(r[0]) != "None":
                             # Check to see if string already contains the value
                             if str(r[0]) not in new_all_apns_string:
@@ -532,9 +531,8 @@ def update_current_apn():
                         i += 1
 
                     if (new_all_apns_string != old_all_apns_string) and (new_all_apns_string != ""):
-                        #row[2] = new_all_apns_string
-                        #cursor.updateRow(row)
-                        print("Updating APNS_CURRENT from " + str(row[2]) + " to " + new_all_apns_string)
+                        row[2] = new_all_apns_string
+                        cursor.updateRow(row)
                         i += 1
 
         print("Number of records updated: " + str(i))
