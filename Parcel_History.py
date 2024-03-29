@@ -13,11 +13,10 @@ Requirements: The script requires the following labuild_years_activeyers and fol
 
 Author: Amy Fish
 Date: 3/28/2023
-Version: 1.0
 
 TODO: 1. Add the ability to email the results of the script
       2. Add the ability to create a new version in the SDE database
-      3. Update PPNO or remove PPNO from data
+      3. Update PPNO
 """
 import arcpy
 
@@ -42,6 +41,7 @@ database_connection = "C:\\Users\\afish\\AppData\\Roaming\\Esri\\ArcGISPro\\Favo
 Parcel_Poly_2023 = "C:\\temp\\gis\\workspace.gdb\\Parcels2023"
 parcel_history = database_connection + "\\SDE.Parcels\\SDE.Parcel_History"
 parcel_master = database_connection + "\\SDE.Parcels\\SDE.Parcel_Master"
+parcel_base = database_connection + "\\SDE.Parcels\\SDE.Parcels_Base"
 
 # Define the output layers
 Parcels_toPoint = "c:\\temp\\gis\\Workspace.gdb\\Parcels_toPoint_2023"
@@ -339,76 +339,7 @@ def find_obsolete_records(input_layer, target_layer, join_field):
         print(e)
         logger.info("Error: " + str(e) + "\n")
 
-def update_attributes():
-    # Insert try and except blocks
-    try:
-        # Set the workspace environment
-        edit = arcpy.da.Editor(arcpy.env.workspace)
-        edit.startEditing()
-        edit.startOperation()
-        print("Started edit session")
-        # https://community.esri.com/t5/python-questions/arcpy-da-updatecursor-on-joined-tables/td-p/179630  
-        luDict = dict([(r[0], (r[1],r[2],r[3])) for r in arcpy.da.SearchCursor(parcel_master, ["APN","APO_ADDRESS","EXISTING_LANDUSE", "JURISDICTION"])])
-        updateRows = arcpy.da.UpdateCursor(parcel_history, ["APN_Current","Current_Address", "LandUse_Description", "Jurisdiction"])
-        
-        for updateRow in updateRows:
-            joinFieldValue = updateRow[0]   #joinFieldValue is populated with APN
-            # Set value to emtpy string if dictionary key does not exist
-            try:
-                # trim spaces from the joinFieldValue
-                master_address = luDict[joinFieldValue][0].strip()
-            except KeyError:
-                master_address = "" 
-            try:
-                master_landuse =  luDict[joinFieldValue][1].strip()
-            except KeyError:
-                master_landuse = ""
-            try:
-                master_county =  luDict[joinFieldValue][2].strip()
-            except KeyError:
-                master_county = ""
-            # Resume next on error
-        
-            history_address = updateRow[1]
-            history_landuse = updateRow[2]
-            history_county = updateRow[3]
-
-            # if master_address is not equal to the current address, update the current address
-            if master_address != history_address:
-                print(str(history_address) + " / " + str(master_address))
-                updateRow[1] = master_address
-                updateRows.updateRow(updateRow)
-                
-            if master_landuse != history_landuse:
-                print(str(history_landuse) + " / " + str(master_landuse))
-                updateRow[2] = master_landuse
-                updateRows.updateRow(updateRow)
-    
-            if master_county != history_county:
-                print(str(history_county) + " / " + str(master_county))
-                updateRow[3] = master_county
-                updateRows.updateRow(updateRow)
-        
-        # Stop the edit session
-        edit.stopEditing(True)
-        print("Stopped edit session")
-    
-    except arcpy.ExecuteError:
-        print("Arcpy error:" + str(arcpy.GetMessages(2)))
-        logger.info("Error: " + str(arcpy.GetMessages(2)) + "\n")
-
-    except Exception as e:
-        # Get line number of error
-        exc_type, exc_obj, tb = sys.exc_info()
-        fname = os.path.split(tb.tb_frame.f_code.co_filename)[1]
-        f = tb.tb_frame
-        lineno = tb.tb_lineno
-        print("Error on line: " + str(lineno))
-        print ("General error:" + str(e))
-        print(exc_type, fname, tb.tb_lineno)
-        logger.info("Error: " + str(e) + "\n")
-
-def populate_new_field():
+def populate_new_fields():
     try:
         arcpy.env.workspace = database_connection
         edit = arcpy.da.Editor(arcpy.env.workspace)
@@ -416,12 +347,27 @@ def populate_new_field():
         edit.startOperation()
 
         # Set b2023Active to true in parcel_master if the parcel is active
-        print("Populating b2023Active field")
-        with arcpy.da.UpdateCursor(parcel_history, ["APN", "b2023Active", "IsActive"]) as cursor:    
+        print("Populating b2023Active and Active fields")
+
+        # Create a dictionary of APNs and IsActive values from 2023Parcels
+        apnDict = dict([(r[0], r[1]) for r in arcpy.da.SearchCursor(Parcel_Poly_2023, ["APN","APN"])])
+        print("Created dictionary")
+        
+        with arcpy.da.UpdateCursor(parcel_history, ["APN", "b2023Active", "IsActive", "Status"]) as cursor:    
+            # Get the APN from the row
             for row in cursor:
-                if row[2] == 1:
+                apn = row[0]
+                # Check if the APN is in the dictionary
+                if apn in apnDict:
                     row[1] = 1
-                    cursor.updateRow(row)
+                    row[2] = 1
+                    row[3] == "Active"
+                else:
+                    row[1] = 0
+                    row[2] = 0
+                    row[3] == "Inactive"
+                cursor.updateRow(row)
+
         # Stop the edit session
         edit.stopEditing(True)
     
@@ -553,6 +499,89 @@ def update_current_apn():
         print(exc_type, fname, tb.tb_lineno)
         logger.info("Error: " + str(e) + "\n")
 
+def update_attributes():
+    # Insert try and except blocks
+    try:
+        
+        edit = arcpy.da.Editor(arcpy.env.workspace)
+        edit.startEditing()
+        edit.startOperation()
+        print("Started edit session")
+        
+        luDict = dict([(r[0], (r[1],r[2])) for r in arcpy.da.SearchCursor(parcel_master, ["APN","APO_ADDRESS","EXISTING_LANDUSE"])])
+        luCountyDict = dict([(r[0], (r[1],r[2])) for r in arcpy.da.SearchCursor(parcel_base, ["APN","JURISDICTION","PPNO"])])
+        
+        i = 0
+        with arcpy.da.UpdateCursor(parcel_history, ["APN_Current","Current_Address", "LandUse_Description", "JURISDICTION", "PPNO"]) as cursor:    
+            # print row count
+            print("Row count: " + str(arcpy.GetCount_management(parcel_history).getOutput(0)))
+            for row in cursor:
+                i += 1
+                if i < 250:
+                    apn_current = row[0]   #joinFieldValue is populated with APN
+                    # Set value to emtpy string if dictionary key does not exist
+                    try:
+                        master_address = luDict[apn_current][0].strip()
+                    except KeyError:
+                        master_address = "" 
+                    try:
+                        master_landuse =  luDict[apn_current][1].strip()
+                    except KeyError:
+                        master_landuse = ""
+                    try:
+                        master_county =  luCountyDict[apn_current][0].strip()
+                    except KeyError:
+                        master_county = ""
+                    try:
+                        master_ppno =  luCountyDict[apn_current][1]
+
+                    except KeyError:
+                        master_ppno = ""
+
+                    history_address = row[1]
+                    history_landuse = row[2]
+                    history_county = row[3]
+                    history_ppno = row[4]
+
+                    # if master_address is not equal to the current address, update the current address
+                    update = False
+                    if master_address != history_address:
+                        row[1] = master_address
+                        update = True
+                    if master_landuse != history_landuse:
+                        row[2] = master_landuse
+                        update = True
+                    if master_county != history_county:
+                        row[3] = master_county
+                        update = True
+                    #if master_ppno != history_ppno:
+                    #    updateRow[4] = master_ppno
+                    #    updateRows.updateRow(updateRow)
+                        
+                    if update:
+                        print("Updating row")
+                        cursor.updateRow(row)                        
+                    
+
+        # Stop the edit session
+        edit.stopEditing(True)
+        print("Stopped edit session")
+    
+    except arcpy.ExecuteError:
+        print("Arcpy error:" + str(arcpy.GetMessages(2)))
+        logger.info("Error: " + str(arcpy.GetMessages(2)) + "\n")
+
+    except Exception as e:
+        # Get line number of error
+        exc_type, exc_obj, tb = sys.exc_info()
+        fname = os.path.split(tb.tb_frame.f_code.co_filename)[1]
+        f = tb.tb_frame
+        lineno = tb.tb_lineno
+        print("Error on line: " + str(lineno))
+        print ("General error:" + str(e))
+        print(exc_type, fname, tb.tb_lineno)
+        logger.info("Error: " + str(e) + "\n")
+
 
 # Call the function to find missing records
 add_missing_records(input_layer, parcel_history, new_output_layer, "APN")
@@ -561,7 +590,7 @@ add_missing_records(input_layer, parcel_history, new_output_layer, "APN")
 find_obsolete_records(input_layer, parcel_history, "APN")
 
 # Set b2023Active for all active parcels (Replace with new field each year)
-populate_new_field()
+populate_new_fields()
 
 # Update Current APN and Current APNs for Inactive parcels
 update_current_apn()
