@@ -394,7 +394,7 @@ def update_parcel_layer(new_fc, old_fc_path, prefix_remove, data_type_mapping, f
                      'COUNTY_LANDUSE_DESCRIPTION', 'IPES_SCORE', 'HRA_NAME', 'WATERSHED_NUMBER', 'WATERSHED_NAME', 
                      'PRIORITY_WATERSHED', 'FIREPD', 'WITHIN_TRPA_BNDY' 
 ]
-    #List fields of dfparcelnew
+
     acella_fields_exclude = []
     for field in dfparcelNew.columns:
         if field not in acella_fields:
