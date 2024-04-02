@@ -401,7 +401,8 @@ def update_parcel_layer(new_fc, old_fc_path, prefix_remove, data_type_mapping, f
             acella_fields_exclude.append(field)
     differences_acella = differenceDictionary(dfparcelOld, dfparcelNew, 'APN', acella_fields_exclude)
     dfdiff_acella = pd.DataFrame(differences_acella)
-    dfdiff_acella.to_csv('Differences_Acella.csv')
+    acella_file_name = new_fc + "Differences_Acella_" + strftime("%Y-%m-%d")+".csv"
+    dfdiff_acella.to_csv(acella_file_name)
     # Create a new version
     #arcpy.CreateVersion_management(inWorkspace, parent_version, new_version_name, "PUBLIC")
     arcpy.ChangeVersion_management(old_fc,'TRANSACTIONAL', version_name_full, '')
