@@ -3303,7 +3303,7 @@ try:
 
     # transfer attributes to Parcel Layer
     fieldJoinCalc_multikey(ParcelLayer, ['APN_TRPA', 'COUNTY_TRPA'],['INDEX_1987_HYPERLINK_TRPA'], 
-                ParcelPoint_Index1987, ['APN_TRPA', 'COUNTY_TRPA'],['MAP_PATH'])
+                ParcelPoint_Index1987, ['APN_TRPA', 'COUNTY_TRPA'],['URL'])
     print ("The 'INDEX_1987_HYPERLINK' field in the parcel data has been updated")
     # log.info("The 'INDEX_1987_HYPERLINK' field in the parcel data has been updated")
 
