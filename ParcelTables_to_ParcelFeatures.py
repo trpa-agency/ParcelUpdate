@@ -1,7 +1,7 @@
 """
 ParcelTables_to_ParcelFeatures.py
 Created: March 13th, 2020
-Last Updated: February 4th, 2024
+Last Updated: 8/11/2024
 Tahoe Regional Planning Agency
 GIS Team, gis@trpa.gov
 
@@ -24,15 +24,20 @@ import sys
 import logging
 from datetime import datetime
 import pandas as pd
+
+# ESRI packages
+import arcpy
+from arcgis.features import GeoAccessor
+from arcgis.features import GeoSeriesAccessor
+from arcgis.features import FeatureSet
+
 # external connection packages
 import requests
 from boxsdk import Client, CCGAuth
 import sqlalchemy as sa
 from sqlalchemy.engine import URL
 from sqlalchemy import create_engine
-# ESRI packages
-import arcpy
-from arcgis.features import FeatureSet, GeoAccessor, GeoSeriesAccessor
+
 # email packages
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -40,13 +45,13 @@ from email.mime.text import MIMEText
 
 # set overwrite to true
 arcpy.env.overwriteOutput = True
-arcpy.env.workspace = "C:\GIS\Scratch.gdb"
+arcpy.env.workspace = "C:\GIS\Staging.gdb"
 
 # in memory output file path
 wk_memory = "memory" + "\\"
 # set workspace and sde connections 
 working_folder = "C:\GIS"
-workspace      = "C:\GIS\Scratch.gdb"
+workspace      = "C:\GIS\Staging.gdb"
 
 # network path to connection files
 filePath = "C:\\GIS\\DB_CONNECT"
@@ -66,6 +71,8 @@ accelaFiles = "//trpa-fs01/GIS/Acella/Reports"
 # Get database user and password from environment variables
 db_user             = os.environ.get('DB_USER')
 db_password         = os.environ.get('DB_PASSWORD')
+#db_user             = 'sde'
+#db_password         = 'staff'
 driver              = 'ODBC Driver 17 for SQL Server'
 tabular_database    = 'sde_tabular'
 serverSQL12         = 'sql12'
@@ -114,7 +121,7 @@ fileToSend = log_file_path
 subject = "Parcel Tables to Parcel Features ETL"
 sender_email = "infosys@trpa.org"
 # password = ''
-receiver_email = "GIS@trpa.gov"
+receiver_email = "gis@trpa.gov"
 
 #---------------------------------------------------------------------------------------#
 ## FUNCTIONS ##
@@ -250,6 +257,7 @@ boxDict = {'Land_Capable_Verifications.csv': "1342591986420",
            'Grading_Exception_Map.csv'      : "1337039879890",
            'Historic_Designations.csv'     : "1342590117002"
            }
+
 
 # function to save Accela Reports from LTinfo API
 getAccelaLTinfoFiles(ltinfoDict)
@@ -736,18 +744,18 @@ try:
 
     # feature class list
     fcs =["Parcel_BMP",
-          "Parcel_Accela_LandCapabilityVerification",
-          "Parcel_Accela_LCV_Challenge",
-          "Parcel_Accela_SoilsHydro",
-          "Parcel_Accela_Historic",
-          "Parcel_Accela_GradingExceptions",
-          "Parcel_LTinfo",
-          "Parcel_LTinfo_IPES",
-          "Parcel_LTinfo_LCV",
-          "Parcel_LTinfo_DevelopmentRight_Banked",
-          "Parcel_LTinfo_DevelopmentRight_Transacted_Banked",
-          "Parcel_LTinfo_DeedRestriction"
-          ]
+        "Parcel_Accela_LandCapabilityVerification",
+        "Parcel_Accela_LCV_Challenge",
+        "Parcel_Accela_SoilsHydro",
+        "Parcel_Accela_Historic",
+        "Parcel_Accela_GradingExceptions",
+        "Parcel_LTinfo",
+        "Parcel_LTinfo_IPES",
+        "Parcel_LTinfo_LCV",
+        "Parcel_LTinfo_DevelopmentRight_Banked",
+        "Parcel_LTinfo_DevelopmentRight_Transacted_Banked",
+        "Parcel_LTinfo_DeedRestriction"
+        ]
 
     # function to update all collection SDE feature classes in list
     updateSDECollectFC(fcs)
@@ -762,7 +770,7 @@ try:
     insert_into_sql(dfAParcel, "Accela_Parcels")
     insert_into_sql(dfAPermit, "Accela_Record_Details")
     #---------------------------------------------------------------------------------------#
-    
+
     # report how long it took to get the data
     endTimer = datetime.datetime.now() - startTimer 
     logger.info(f"\nTime it took to update Collection SDE feature classes: {endTimer}") 
