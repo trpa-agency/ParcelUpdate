@@ -35,7 +35,7 @@ parcelNew = 'parcelNew'
 arcpy.MakeFeatureLayer_management("F:\GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb/Parcel_County_Staging", parcelNew)
 
 parcelNew_points = 'parcelNew_points'
-arcpy.MakeFeatureLayer_management("F:\GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb/Parcel_Points", parcelNew)
+arcpy.MakeFeatureLayer_management("F:\GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb/Parcel_Points", parcelNew_points)
 
 #Define special parcels that need to be ignored
 df_special_parcels = pd.read_excel("F:\GIS/PARCELUPDATE/Workspace/special_parcels.xlsx")
@@ -115,8 +115,8 @@ utils.update_parcel_layer(parcelNew, master_fc_path,prefix_remove, data_type_map
 utils.update_parcel_layer(parcelNew, base_fc_path,prefix_remove, data_type_mapping, fields_to_exclude_base, fields_to_ignore_base,
                           df_special_parcels,base_difference_csv, database_connection, version_name_full)
 #Update Parcel Points - maybe just generate parcel points? do we need to keep track of edit date for that
-utils.update_parcel_layer(parcelNew_points, points_fc_path,prefix_remove, data_type_mapping, fields_to_exclude_points, fields_to_ignore_points,
-                          df_special_parcels,points_difference_csv, database_connection, version_name_full)
+# utils.update_parcel_layer(parcelNew_points, points_fc_path,prefix_remove, data_type_mapping, fields_to_exclude_points, fields_to_ignore_points,
+#                           df_special_parcels,points_difference_csv, database_connection, version_name_full)
 
 
 #We need to create a connection to Base
