@@ -35,7 +35,7 @@ parcelNew = 'parcelNew'
 arcpy.MakeFeatureLayer_management("F:\GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb/Parcel_County_Staging", parcelNew)
 
 parcelNew_points = 'parcelNew_points'
-arcpy.MakeFeatureLayer_management("F:\GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb/Parcel_Points", parcelNew)
+arcpy.MakeFeatureLayer_management("F:\GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb/Parcel_Points", parcelNew_points)
 
 #Define special parcels that need to be ignored
 df_special_parcels = pd.read_excel("F:\GIS/PARCELUPDATE/Workspace/special_parcels.xlsx")
