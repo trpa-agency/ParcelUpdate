@@ -21,6 +21,8 @@ inWorkspace = "F:\GIS\PARCELUPDATE\Workspace\Vector.sde"
 arcpy.env.workspace = inWorkspace
 
 #Make parcel points
+if arcpy.Exists(r"F:\GIS\PARCELUPDATE\Workspace\ParcelStaging.gdb\Parcel_Points"):
+    arcpy.management.Delete(r"F:\GIS\PARCELUPDATE\Workspace\ParcelStaging.gdb\Parcel_Points")
 arcpy.management.FeatureToPoint(
     in_features=r"F:\GIS\PARCELUPDATE\Workspace\ParcelStaging.gdb\Parcel_County_Staging",
     out_feature_class=r"F:\GIS\PARCELUPDATE\Workspace\ParcelStaging.gdb\Parcel_Points",
@@ -118,38 +120,4 @@ utils.update_parcel_layer(parcelNew, base_fc_path,prefix_remove, data_type_mappi
 # utils.update_parcel_layer(parcelNew_points, points_fc_path,prefix_remove, data_type_mapping, fields_to_exclude_points, fields_to_ignore_points,
 #                           df_special_parcels,points_difference_csv, database_connection, version_name_full)
 
-
-#We need to create a connection to Base
-server_name = "sql12"
-database_name = "sde_tabular"
-username = "sde"
-password = "staff"
-#change to include date dynamically
-#version_name = "parcel_update_10182023"
-
-# Create a new connection to the enterprise geodatabase in the script directory
-#enterprise_connection = os.path.join(script_directory, "EnterpriseDBConnection.sde")
-
-arcpy.CreateDatabaseConnection_management(
-    out_folder_path='db_connections/',
-    out_name="ConnectionFile_Tabular.sde",
-    database_platform="SQL_SERVER",  # Replace with your DBMS type (e.g., ORACLE, SQL_SERVER, POSTGRESQL)
-    instance=server_name,
-    database=database_name,
-    account_authentication="DATABASE_AUTH",  # Use "OPERATING_SYSTEM" for OS authentication
-    username=username,
-    password=password,
-    version_type='TRANSACTIONAL'
-)
-
-filepath = "F:\GIS/PARCELUPDATE/Workspace/Parcel_Old_New/"
-parcel_list_name = "Parcel_Old_New" + strftime("%Y-%m-%d")+".csv"
-utils.df_parcel_changes.to_csv(filepath+parcel_list_name, index=False)
-
-inWorkspace = 'db_connections/ConnectionFile_Tabular.sde'
-arcpy.env.workspace = inWorkspace
-
-try:
-    arcpy.management.Append(filepath+parcel_list_name, 'Parcel_APN_NewOld', schema_type="NO_TEST")    
-except Exception as e:
-    print (f"Issue with updating list of new and old parcels: {e}")
+# Parcel APN Old New Moved to a CountyParcel_OldNew.py
