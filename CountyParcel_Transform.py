@@ -1,7 +1,7 @@
 """
 CountyParcel_Transform.py
 Created: June 15th,2023
-Last Updated: October 20th, 2023
+Last Updated: October 28th, 2023
 Amy Fish, Tahoe Regional Planning Agency
 Andy McClary, Tahoe Regional Planning Agency
 Mason Bindl, Tahoe Regional Planning Agency
@@ -140,7 +140,8 @@ baseFields = [
 # ['OWNER_NAME_TRPA', 'TEXT', 'Owner Name', 255],
 ['MAIL_ADD1_TRPA', 'TEXT', 'Mailing Address', 100],
 ['MAIL_CITY_TRPA', 'TEXT', 'Mailing City', 50],
-['MAIL_STATE_TRPA', 'TEXT', 'Mailing State', 25],
+#['MAIL_STATE_TRPA', 'TEXT', 'Mailing State', 25],
+['MAIL_STATE_TRPA', 'TEXT', 'Mailing State', 2],
 ['MAIL_ZIP5_TRPA', 'TEXT', 'Mailing Zip Code', 5],
 # value fields  
 ['AS_LANDVALUE_TRPA', 'LONG','Assessed Land Value'],
@@ -232,7 +233,7 @@ fileToSend = log_file_path
 subject = "Parcel Transformation Log File"
 sender_email = "infosys@trpa.org"
 # password = ''
-receiver_email = "gis@trpa.gov"
+receiver_email = "afish@trpa.gov"
 #----------------------------------------------------------------------
 # FUNCTIONS
 #----------------------------------------------------------------------
@@ -279,47 +280,53 @@ def UpdateFieldFromDictionary(featureclass, field, update_dictionary):
                 cursor.updateRow(row)
                 record_count+=record_count
     logger.info(f"{record_count} rows were updated")
+    #record_count = 0
                     
 # combine duplicate records, creating multipart and dissolved polygons 
 @timer
-def CombineAPNs(fc, fld_dissolve):    
-    from time import strftime  
-    print("Started combining APNs: " + strftime("%Y-%m-%d %H:%M:%S"))
-    # get unique values from field
-    value_list = [r[0] for r in arcpy.da.SearchCursor(fc, (fld_dissolve))]
-    unique_vals = list(set(value_list))
-    if len(value_list) !=len(unique_vals):
-        seen = set()
-        dup_vals = set()
-        for x in value_list:
-            if x in seen:
-                dup_vals.add(x)
-            else:
-                seen.add(x)
-        print(dup_vals)
-        dup_vals.remove('')
-        for unique_val in dup_vals:
-            geoms = [r[0] for r in arcpy.da.SearchCursor(fc, ('SHAPE@', fld_dissolve)) if r[1] == unique_val]
-            #Probably don't need this as there will always be more than one geometry
-            if len(geoms) > 1:
-                print(unique_val)    
-                diss_geom = DissolveGeoms(geoms)
-
-                # update the first feature with new geometry and delete the others
-                where = "{} = '{}'".format(fld_dissolve, unique_val)
-                cnt = 0
-                with arcpy.da.UpdateCursor(fc, ('SHAPE@'), where) as curs:
-                    for row in curs:
-                        cnt += 1
-                        if cnt == 1:
-                            row[0] = diss_geom
-                            curs.updateRow(row)
-                        else:
-                            curs.deleteRow()
-    else:
-        print("No duplicates!")
-    print ("Finished combining APNs: " + strftime("%Y-%m-%d %H:%M:%S"))
-    
+def CombineAPNs(fc, fld_dissolve): 
+    try:
+        from time import strftime  
+        print("Started combining APNs: " + strftime("%Y-%m-%d %H:%M:%S"))
+        # get unique values from field
+        value_list = [r[0] for r in arcpy.da.SearchCursor(fc, (fld_dissolve))]
+        unique_vals = list(set(value_list))
+        if len(value_list) !=len(unique_vals):
+            seen = set()
+            dup_vals = set()
+            for x in value_list:
+                if x in seen:
+                    dup_vals.add(x)
+                else:
+                    seen.add(x)
+            print(dup_vals)
+            dup_vals.remove('')
+            for unique_val in dup_vals:
+                geoms = [r[0] for r in arcpy.da.SearchCursor(fc, ('SHAPE@', fld_dissolve)) if r[1] == unique_val]
+                #Probably don't need this as there will always be more than one geometry
+                if len(geoms) > 1:
+                    print(unique_val)    
+                    diss_geom = DissolveGeoms(geoms)
+                    # update the first feature with new geometry and delete the others
+                    where = "{} = '{}'".format(fld_dissolve, unique_val)
+                    cnt = 0
+                    with arcpy.da.UpdateCursor(fc, ('SHAPE@'), where) as curs:
+                        for row in curs:
+                            cnt += 1
+                            if cnt == 1:
+                                row[0] = diss_geom
+                                curs.updateRow(row)
+                            else:
+                                curs.deleteRow()
+        else:
+            print("No duplicates!")
+        print ("Finished combining APNs: " + strftime("%Y-%m-%d %H:%M:%S"))
+    except Exception as e:
+        exc_type, exc_obj, tb = sys.exc_info()
+        f = tb.tb_frame
+        lineno = tb.tb_lineno
+        print(str(lineno) + ": " + e.args[0])
+        logger.error(e)    
 # union all geometry inputs into one dissolved geometry
 @timer
 def DissolveGeoms(geoms):
@@ -331,7 +338,7 @@ def DissolveGeoms(geoms):
         else:
             diss_geom = diss_geom.union(geom)
     return diss_geom
-
+            
 # moves attribute values from one feature class to the other using an aspatial join
 @timer
 def fieldJoinCalc(updateFC, updateFieldsList, sourceFC, sourceFieldsList):
@@ -374,7 +381,7 @@ def fieldJoinCalc_multikey(updateFC, updateFieldsList_key, updateFieldsList_valu
                     updateRow[2] = valueDict[keyValue]  
                     updateRows.updateRow(updateRow)    
     del valueDict  
-    logger.info("Finished data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
+    #logger.info("Finished data transfer: " + strftime("%Y-%m-%d %H:%M:%S"))
 
 # send email with attachments
 def send_mail(body):
@@ -431,7 +438,7 @@ try:
                                             'STR_NAME_TRPA',            #5
                                             'STR_SUFFIX_TRPA',          #6
                                             'UNIT_NUMBR_TRPA',          #7
-                                            'APO_ADDRESS_TRPA',         #8
+                                            'APO_ADDRESS_TRPA',         #8d
                                             'PSTL_TOWN_TRPA',           #9
                                             'PSTL_STATE_TRPA',          #10
                                             'PSTL_ZIP5_TRPA',           #11
@@ -479,6 +486,7 @@ try:
                                             'Improv_Val',# improvedvalue#46
                                             'LU',    # land use code    #47
                                             'Total_DWUnits',  # units   #48
+                              
 
     ]) as cursor:
         # loop through each record and transform the values
@@ -578,7 +586,9 @@ try:
             # Mailing State
             mail_state = row[43]
             if not (mail_state is None or mail_state=='' or mail_state.isspace()==True):
-                row[15] = mail_state.strip().rsplit(',')[-1].strip()
+                #row[15] = mail_state.strip().rsplit(',')[-1].strip()
+                row[15] = mail_state.strip().rsplit(',')[-1].strip()[:2]
+                #todo: trim to 2 chars
             else:
                 row[15] = ''
             
@@ -642,6 +652,7 @@ try:
             # County Land Use Code
             county_luc = row[47]
             if not (county_luc is None):
+
                 row[24] = str(county_luc)
             else:
                 row[24] = '' 
@@ -652,7 +663,7 @@ try:
                 row[27] = units
             else:
                 row[27] = None
-            
+         
     #         Update the row.
             cursor.updateRow(row)
     del cursor
@@ -855,7 +866,8 @@ try:
             # Mailing State - Added logic to set anything that isn't 2 characters long to '' 
             mail_state = str(row[42]).rsplit(',')[-1].strip().split(' ',1)[0].strip()
             if not (mail_state is None or mail_state=='' or mail_state.isspace()==True or len(mail_state)!=2):
-                row[15] = mail_state
+                #row[15] = mail_state
+                row[15] = mail_state[:2]
             else:
                 row[15] = ''
             
@@ -1419,9 +1431,7 @@ try:
     del cursor
 
     out_coordinate_system = arcpy.SpatialReference('NAD 1983 UTM Zone 10N') 
-
     CombineAPNs(eldoradoParcel, 'APN_TRPA')
-
     arcpy.Project_management(eldoradoParcel, parcel_out, out_coordinate_system)
     print('New El Dorado Parcels transformed')
     logger.info("New El Dorado Parcels Transformed")
@@ -1492,17 +1502,18 @@ try:
                                             'SP_APT',  # unit number      #41
                                             'OWNER1',# owner name         #42
                                             'OWNER2',# owner 2            #43
-                                            'ADR1',  # mailing addr1      #44
-                                            'ADR2',  # mailing addr2      #45
-                                            'CITY',  # city               #46 
-                                            'STATE', # state              #47
-                                            'ZIP',  # zip                 #48
+                                            'MailingAdr1',  # mailing addr1      #44
+                                            'MailingAdr2',  # mailing addr2      #45
+                                            'MailingCity',  # city               #46 
+                                            'MailingState', # state              #47
+                                            'MailingZip',  # zip                 #48
                                             'USE_CD', # land use code     #49
                                             'USE_CD_N', # land use desc   #50
                                             'LANDVALUE',# land value      #51
                                             'STRUCTURE',# improved value  #52
                                             'EffectiveYr',# year built     #53
-                                            'StructureSF'  # build sqft      #54
+                                            'StructureSF',  # build sqft      #54
+                                            'SitusZip'      # Parcel zip      #55
                                         
     ]) as cursor:   
         # loop through each record to transform values to TRPA schema values
@@ -1563,7 +1574,8 @@ try:
             # APO Address
             full_address = [house, street_direction, street_name, street_suffix, unit]
             adr = str(' '.join(filter(None, full_address))).strip()
-            
+            adr = re.sub(r"\s+", " ", adr).strip()
+
             if not (adr is None or adr=='' or adr.isspace()==True):
                 row[8] = adr
             else:
@@ -1573,8 +1585,6 @@ try:
                 
             # Postal State
             row[10] = 'CA'
-
-            # Postal City - See TRPA ATTRIBUTION section
             
             # Owner Name
             owner1 = row[42]
@@ -1604,7 +1614,7 @@ try:
                 row[15] = str(address1).strip()
             else:
                 row[15] = ''
-                    
+            
             # Mailing City
             mail_city = row[46]
             
@@ -1616,7 +1626,8 @@ try:
             # Mailing State
             mail_state = row[47]
             if not (mail_state is None or mail_state=='' or mail_state.isspace()==True):
-                row[17] = mail_state
+                #row[17] = mail_state
+                row[17] = mail_state[:2]
             else:
                 row[17] = ''
             
@@ -1699,6 +1710,13 @@ try:
                 row[32] = bldsqft
             else:
                 row[32] = None
+
+            # Postal Zip
+            parcelzip = row[55]
+            if not (parcelzip is None):
+                row[11] = parcelzip
+            else:
+                row[11] = None
                 
             # Update the row.
             cursor.updateRow(row)
@@ -1970,7 +1988,8 @@ try:
             # Mailing State
             mail_state = row[49]
             if not (mail_state is None or mail_state=='' or mail_state.isspace()==True):
-                row[17] = mail_state
+                #row[17] = mail_state
+                row[17] = mail_state[:2]
             else:
                 row[17] = ''
             
@@ -2289,7 +2308,7 @@ try:
                 "UNITED STATES OF AMERICA & LAKE TAHOE BASIN MGT UN", "UNITED STATES OF AMERICA & REGIONAL LAND ADJUSTMEN",
                 "UNITED STATES OF AMERICA & U S FOREST SERVICE", "UNITED STATES OF AMERICA & U S FOREST SERVIE",
                 "UNITED STATES OF AMERICA & USDA FOREST SER LAKE TA", "UNITED STATES OF AMERICA & USDA FOREST SERVICE",
-                "USDA - FOREST SERVICE & LAKE TAHOE BASIN MGMT UNIT")
+                "USDA - FOREST SERVICE & LAKE TAHOE BASIN MGMT UNIT", "LAKE VALLEY RANGER STA & U S FOREST SERVICE", "UNITED STATES OF AMERICA & US FOREST SERVICE")
 
     stateOwnList = ("TAHOE CONSERVANCY", "STATE OF NEVADA FOREST SERVICE", "STATE OF NEVADA", "STATE OF CALIFORNIA THE", 
                     "STATE OF CALIFORNIA (EASEMENT)", "STATE OF CALIFORNIA", "STATE OF CA", "REGENTS OF UNIV OF CALIF",
@@ -2303,12 +2322,12 @@ try:
                     "STATE OF CALIFORNIA & DEPARTMENT OF TRANSPORTATION", "STATE OF CALIFORNIA & DEPT OF GEN SRVS R E DIV", "STATE OF CALIFORNIA & DEPT OF GENERAL SERVICES",
                     "STATE OF CALIFORNIA & DEPT OF PARKS & RECREATION", "STATE OF CALIFORNIA & DEPT OF TRANSPORTATION", "STATE OF CALIFORNIA & PARKS & RECREATION",
                     "STATE OF CALIFORNIA (EASEMENT) & CALIFORNIA TAHOE", "CALIFORNIA STATE PARKS AND RECREATION",
-                    "CALIFORNIA STATE OF & DEPT GEN SERVICES REAL ESTAT")
+                    "CALIFORNIA STATE OF & DEPT GEN SERVICES REAL ESTAT", "STATE OF CALIFORINA & CALIFORNIA TAHOE CONSERVANCY")
 
     localOwnList = ("ZEPHYR COVE GENERAL IMP DIST", "WASHOE COUNTY SCHOOL DISTRICT BOARD", "WASHOE COUNTY", "WASHOE TRIBE OF NV & CA", 
                     "TALMONT RESORT IMPROVEMENT DISTRICT", "TALMONT RESORT IMPR DIST", "TALMONT RESORT IMP DISTRICT",
                     "TALMONT RESORT IMP DIST", "TAHOE PARADISE RESORT IMP DIST", "TAHOE PARADISE RES IMP DST",
-                    "TAHOE FOREST HOSPITAL DISTRICT", "TAHOE TRUCKEE UNIFIED SCHOOL DISTRICT", "TAHOE TRUCKEE UNIFIED SCH DIST", 
+                    "TAHOE TRUCKEE UNIFIED SCHOOL DISTRICT", "TAHOE TRUCKEE UNIFIED SCH DIST", 
                     "TAHOE DOUGLAS FIRE PROTECT DIST", "TAHOE DOUGLAS SEWER DIST", "TAHOE DOUGLAS DISTRICT", 
                     "TAHOE CITY PUBLIC UTILITY DISTRICT", "TAHOE CITY PUBLIC UTILITY DIST", "TAHOE CITY PUBLIC UTILDIST", 
                     "TAHOE CITY PUB UTILITY DST", "TAHOE CITY PUB UTILITY DIS", "TAHOE CITY P U D", "TAHOE CITY CEMETERY DIST", 
@@ -2338,14 +2357,14 @@ try:
                     "COUNTY OF EL DORADO & COUNSEL'S OFFICE", "COUNTY OF EL DORADO & DEPARTMENT OF PUBLIC WORKS", "COUNTY OF EL DORADO & DEPARTMENT OF TRANSPORTATION",
                     "COUNTY OF EL DORADO & DEPT OF PUBLIC WORKS", "COUNTY OF EL DORADO & DEPT OF TRANSPORTATION", "COUNTY OF EL DORADO & GENERAL SERVICES DEPARTMENT",
                     "COUNTY OF EL DORADO & OF EL DORADO", "COUNTY OF EL DORADO & PUBLIC WORKS DEPARTMENT", "EL DORADO CO OFFICE EDUCATION", "EL DORADO COUNTY & SUPERINTENDENT OF SCHOOLS",
-                    "EL DORADO COUNTY & BOARD OF SUPERVISORS", "LAKE TAHOE COMMUNITY COLLEGE DIST", "LAKE VALLEY RANGER STA & U S FOREST SERVICE",
+                    "EL DORADO COUNTY & BOARD OF SUPERVISORS", "LAKE TAHOE COMMUNITY COLLEGE DIST", 
                     "LAKE VALLEY FIRE PROTECTION & DISTRICT POLITICAL S", "SOUTH TAHOE PUBLIC & UTILITY DISTRICT",
                     "SOUTH TAHOE PUBLIC UTILITY &  DISTRIC", "SOUTH TAHOE PUBLIC UTIL DIST & CA MUNICIPAL CORP", "TAHOE CITY PUBLIC UTIL DST",
                     "TAHOE RESOURCE CONSERVATION &  DISTRIC", "TAHOE RESOURCE CONSERVATION DIST  C/O DISTRICT MANAGER", "FALLEN LEAF COMM SERVICES DIST",
                     "FALLEN LEAF LAKE COMM SERVDIST", "TAHOE DOUGLAS VISITORS AUTH", "KINGSBURY GENARAL IMP DIST", "ALPINE SPRINGS CO WTR DIST FIN CORP",
                     "COUNTY OF PLACER", "MCKINNEY WATER DISTRICT", "NORTHSTAR COMMUNITY SERVICES DISTRICT", "PLACER COUNTY PUBLIC WORKS",
                     "REDEVELOPMENT AGENCY OF THE COUNTY OF PL", "TRUCKEE DONNER PUBLIC UTILITY DISTRICT", "TRUCKEE SANITARY DISTRICT",
-                    "TAHOE TRANSPORTATION DISTRICT") 
+                    "TAHOE TRANSPORTATION DISTRICT", "PLACER COUNTY OF") 
 
     with arcpy.da.UpdateCursor(ParcelLayer, ["OWN_FULL_TRPA", "OWNERSHIP_TYPE_TRPA"]) as cursor:
         for row in cursor:
@@ -2968,9 +2987,10 @@ try:
         # Create an expression to find records with null values in either field
     print('Checking For Nulls')
 
-    expression = f"{'APN_TRPA'} IS NULL OR {'COUNTY_TRPA'} IS NULL"
-
+    #expression = "{'APN_TRPA'} IS NULL OR {'COUNTY_TRPA'} IS NULL"
+    expression = "'APN_TRPA' IS NULL OR 'COUNTY_TRPA' IS NULL"
     # Use an UpdateCursor to delete records with null values
+    # Failing Create cursor has failed
     with arcpy.da.UpdateCursor(ParcelLayer, ['APN_TRPA', 'COUNTY_TRPA'], where_clause=expression) as cursor:
         for row in cursor:
             cursor.deleteRow()
@@ -3303,7 +3323,7 @@ try:
 
     # transfer attributes to Parcel Layer
     fieldJoinCalc_multikey(ParcelLayer, ['APN_TRPA', 'COUNTY_TRPA'],['INDEX_1987_HYPERLINK_TRPA'], 
-                ParcelPoint_Index1987, ['APN_TRPA', 'COUNTY_TRPA'],['URL'])
+                ParcelPoint_Index1987, ['APN_TRPA', 'COUNTY_TRPA'],['MAP_PATH'])
     print ("The 'INDEX_1987_HYPERLINK' field in the parcel data has been updated")
     # log.info("The 'INDEX_1987_HYPERLINK' field in the parcel data has been updated")
 
@@ -3312,23 +3332,30 @@ try:
     # log.info("Starting the Postal Town Spatial Join: " + strftime("%Y-%m-%d %H:%M:%S"))
 
     # Spatial Join
-    arcpy.SpatialJoin_analysis(ParcelPoint, sde_Zip, ParcelPoint_PstlTown, 
+    #arcpy.SpatialJoin_analysis(ParcelPoint, sde_Zip, ParcelPoint_PstlTown, 
+    #                        "JOIN_ONE_TO_ONE", "KEEP_ALL", "", "HAVE_THEIR_CENTER_IN", "", "")
+    #print ("Finished the Postal Town Spatial Join: " + strftime("%Y-%m-%d %H:%M:%S"))
+    arcpy.SpatialJoin_analysis(ParcelPoint, sde_UrbanArea, ParcelPoint_PstlTown, 
                             "JOIN_ONE_TO_ONE", "KEEP_ALL", "", "HAVE_THEIR_CENTER_IN", "", "")
     print ("Finished the Postal Town Spatial Join: " + strftime("%Y-%m-%d %H:%M:%S"))
+    
     # log.info("Finished the Postal Town Spatial Join: " + strftime("%Y-%m-%d %H:%M:%S"))
 
     # transfer attributes to Parcel Layer
+    #fieldJoinCalc_multikey(ParcelLayer, ['APN_TRPA', 'COUNTY_TRPA'],['PSTL_TOWN_TRPA'], 
+    #            ParcelPoint_PstlTown, ['APN_TRPA', 'COUNTY_TRPA'],['PO_NAME'])
+    #print ("The 'PSTL_TOWN' field in the parcel data has been updated")
     fieldJoinCalc_multikey(ParcelLayer, ['APN_TRPA', 'COUNTY_TRPA'],['PSTL_TOWN_TRPA'], 
-                ParcelPoint_PstlTown, ['APN_TRPA', 'COUNTY_TRPA'],['PO_NAME'])
-    print ("The 'PSTL_TOWN' field in the parcel data has been updated")
+                ParcelPoint_PstlTown, ['APN_TRPA', 'COUNTY_TRPA'],['NAME'])
+    #print ("The 'PSTL_TOWN' field in the parcel data has been updated")
     # log.info("The 'PSTL_TOWN' field in the parcel data has been updated")
 
     ### Postal ZIP ---------------------------------------------------------------------------------------------------###
 
     # transfer attributes to Parcel Layer
-    fieldJoinCalc_multikey(ParcelLayer, ['APN_TRPA', 'COUNTY_TRPA'],['PSTL_ZIP5_TRPA'], 
-                ParcelPoint_PstlTown, ['APN_TRPA', 'COUNTY_TRPA'],['ZIP_CODE'])
-    print("The 'PSTL_ZIP5' field in the parcel data has been updated")
+    #fieldJoinCalc_multikey(ParcelLayer, ['APN_TRPA', 'COUNTY_TRPA'],['PSTL_ZIP5_TRPA'], 
+    #            ParcelPoint_PstlTown, ['APN_TRPA', 'COUNTY_TRPA'],['ZIP_CODE'])
+    #print("The 'PSTL_ZIP5' field in the parcel data has been updated")
     # log.info("The 'PSTL_ZIP5' field in the parcel data has been updated")
 
     ### CSLT Jurisdiction Update -------------------------------------------------------------------------------------###
@@ -3593,7 +3620,7 @@ try:
 # catch any arcpy errors
 except arcpy.ExecuteError:
     logger.error(arcpy.GetMessages())
-
+    print(arcpy.GetMessages())
     header = "ERROR - Arcpy Exception - Check Log"
     # send email with header based on try/except result
     send_mail(header)
@@ -3603,9 +3630,11 @@ except Exception:
     e = sys.exc_info()[1]
     logger.info(e.args[0])
     logger.error(e)
+    # print line number error is on
+    exc_type, exc_obj, tb = sys.exc_info()
+    f = tb.tb_frame
+    lineno = tb.tb_lineno
+    print("line: " + str(lineno) + ", Error: " + e.args[0])
     header = "ERROR - System Error - Check Log"
     # send email with header based on try/except result
     send_mail(header)
-
-
-

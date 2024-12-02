@@ -4,6 +4,31 @@ import arcpy
 import pandas as pd
 from time import strftime
 import utils
+import argparse
+import sys
+
+arguments = sys.argv[1:] 
+# Make sure arguments are passed
+if len(arguments) == 0:
+    print("No arguments passed. Exiting...")
+    sys.exit()
+# See if arguments is base or master
+runBase = False
+runMaster = False
+if arguments[0] == 'base':
+    print("Base argument passed")
+    runBase = True
+elif arguments[0] == 'master':
+    print("Master argument passed")
+    runMaster = True
+elif arguments[0] == 'both':
+    print("Both argument passed")
+    runBase = True
+    runMaster = True
+else:
+    print("Invalid argument passed. Exiting...")
+    sys.exit()
+
 
 # environment settings
 arcpy.env.workspace = "F:/GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb"
@@ -110,14 +135,13 @@ data_type_mapping = {
     "Date": pd.to_datetime
 }
 
-#Update parcel master
-utils.update_parcel_layer(parcelNew, master_fc_path,prefix_remove, data_type_mapping, fields_to_exclude_master, fields_to_ignore_master,
-                          df_special_parcels,master_difference_csv, database_connection, version_name_full)
-#Update Parcel Base
-utils.update_parcel_layer(parcelNew, base_fc_path,prefix_remove, data_type_mapping, fields_to_exclude_base, fields_to_ignore_base,
-                          df_special_parcels,base_difference_csv, database_connection, version_name_full)
-#Update Parcel Points - maybe just generate parcel points? do we need to keep track of edit date for that
-# utils.update_parcel_layer(parcelNew_points, points_fc_path,prefix_remove, data_type_mapping, fields_to_exclude_points, fields_to_ignore_points,
-#                           df_special_parcels,points_difference_csv, database_connection, version_name_full)
+if runMaster:
+    #Update parcel master
+    utils.update_parcel_layer(parcelNew, master_fc_path,prefix_remove, data_type_mapping, fields_to_exclude_master, fields_to_ignore_master,
+                            df_special_parcels,master_difference_csv, database_connection, version_name_full)
+elif runBase:   
+    #Update Parcel Base
+    utils.update_parcel_layer(parcelNew, base_fc_path,prefix_remove, data_type_mapping, fields_to_exclude_base, fields_to_ignore_base,
+                            df_special_parcels,base_difference_csv, database_connection, version_name_full)
 
-# Parcel APN Old New Moved to a CountyParcel_OldNew.py
+
