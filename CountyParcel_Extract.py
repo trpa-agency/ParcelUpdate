@@ -41,7 +41,7 @@ from time import strftime
 arcpy.env.workspace = "//Trpa-fs01/GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb"
 arcpy.env.overwriteOutput = True
 arcpy.env.outputCoordinateSystem = arcpy.SpatialReference(26910)
-
+    
 # set workspace and sde connections 
 workspace = "//Trpa-fs01/GIS/PARCELUPDATE/Workspace/Staging"
 

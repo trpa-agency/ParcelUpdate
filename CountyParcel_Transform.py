@@ -1,7 +1,7 @@
 """
 CountyParcel_Transform.py
 Created: June 15th,2023
-Last Updated: October 28th, 2023
+Last Updated: January 26, 2025 
 Amy Fish, Tahoe Regional Planning Agency
 Andy McClary, Tahoe Regional Planning Agency
 Mason Bindl, Tahoe Regional Planning Agency
@@ -224,6 +224,10 @@ FIRSTstartTimer = datetime.datetime.now()
 # Log different types of messages
 logger.info("Script Started: " + str(FIRSTstartTimer) + "\n")
 
+# Setup Counties to run
+counties_to_run = ['El Dorado', 'Placer', 'Douglas', 'Washoe', 'Carson City']
+counties_to_run = ['Douglas']
+
 ##--------------------------------------------------------------------------------------------------------#
 ## SETUP SEND EMAIL WITH LOG FILE ##
 ##--------------------------------------------------------------------------------------------------------#
@@ -233,11 +237,10 @@ fileToSend = log_file_path
 subject = "Parcel Transformation Log File"
 sender_email = "infosys@trpa.org"
 # password = ''
-receiver_email = "afish@trpa.gov"
+receiver_email = "gis@trpa.gov"
 #----------------------------------------------------------------------
 # FUNCTIONS
 #----------------------------------------------------------------------
-
 ### Functions ###
 # time a function function
 ## use as decorator @timer
@@ -403,6 +406,9 @@ def send_mail(body):
     except Exception as e:
         logger.error(e)
 
+# Function to check if a county exists in the list of counties to run
+def is_county_in_list(county, county_list):
+    return county in county_list
 #-----------------------------------------------------------------------
 # START TRANSFORMATION
 #-----------------------------------------------------------------------
@@ -414,774 +420,716 @@ try:
     # CARSON COUNTY TRANSFORMATION
     #-----------------------------------------------------------------------
     # get staging feature class and name output transformed feature class
-    in_features = "Parcel_CC_Extracted"
-    parcel_out  = "Parcel_CC_Transformed"
+    county_to_check = 'Carson City'
+    exists = is_county_in_list(county_to_check, counties_to_run)
+    print(f"Is {county_to_check} in the list? {exists}")
+    
+    if exists == 1:
+        in_features = "Parcel_CC_Extracted"
+        parcel_out  = "Parcel_CC_Transformed"
 
-    # in-memory feature class
-    carsonParcel = r"in_memory/inMemoryFeatureClass"
+        # in-memory feature class
+        carsonParcel = r"in_memory/inMemoryFeatureClass"
 
-    # copy feature class into in-memory feature class to work on
-    arcpy.management.CopyFeatures(in_features, carsonParcel)
+        # copy feature class into in-memory feature class to work on
+        arcpy.management.CopyFeatures(in_features, carsonParcel)
 
-    # Add TRPA base fields
-    arcpy.management.AddFields(carsonParcel, baseFields)
+        # Add TRPA base fields
+        arcpy.management.AddFields(carsonParcel, baseFields)
 
-    # Do work.
-    with arcpy.da.UpdateCursor(carsonParcel, [
-                                            ## TRPA base schema ##
-                                            'APN_TRPA',                 #0
-                                            'PPNO_TRPA',                #1
-                                            'JURISDICTION_TRPA',        #2
-                                            # parcel address   
-                                            'HSE_NUMBR_TRPA',           #3
-                                            'STR_DIR_TRPA',             #4
-                                            'STR_NAME_TRPA',            #5
-                                            'STR_SUFFIX_TRPA',          #6
-                                            'UNIT_NUMBR_TRPA',          #7
-                                            'APO_ADDRESS_TRPA',         #8d
-                                            'PSTL_TOWN_TRPA',           #9
-                                            'PSTL_STATE_TRPA',          #10
-                                            'PSTL_ZIP5_TRPA',           #11
-                                            # owner fields
-                                                # no first and last fields
-                                            'OWN_FULL_TRPA',            #12
-                                            'MAIL_ADD1_TRPA',           #13
-                                            'MAIL_CITY_TRPA',           #14
-                                            'MAIL_STATE_TRPA',          #15
-                                            'MAIL_ZIP5_TRPA',           #16
-                                            # value fields  
-                                            'AS_LANDVALUE_TRPA',        #17
-                                            'AS_IMPROVALUE_TRPA',       #18
-                                            'AS_SUM_TRPA',              #19
-                                            'TAX_LANDVALUE_TRPA',       #20 
-                                            'TAX_IMPROVALUE_TRPA',      #21
-                                            'TAX_SUM_TRPA',             #22
-                                            'TAX_YEAR_TRPA',            #23
-                                            # land use fields 
-                                            'COUNTY_LANDUSE_CODE_TRPA', #24
-                                            'COUNTY_LANDUSE_TRPA',      #25
-                                            # Fields for building info
-                                            "YEAR_BUILT_TRPA",          #26
-                                            'UNITS_TRPA',               #27
-                                            'BEDROOMS_TRPA',            #28
-                                            'BATHROOMS_TRPA',           #29
-                                            'BUILDING_SQFT_TRPA',       #30
-                                            'VHR_TRPA',                 #31
-                                            'HOA_TRPA',                 #32
-                                            ###-------------------------###
-                                            # County Fields to get data from
-                                            'APN',   # apn              #33
-                                            'APN_NUM',   # ppno         #34
-                                            'Phy_Addr', #full adr       #35
-                                            'Loc1', # house number      #36
-                                            'Dir',# street dir          #37
-                                            'Street_Name',# street name #38
-                                            'Unit',  # unite Number     #39
-                                            'Legal_Owner',  # Owner     #40
-                                            'Mail_Addr',# mail address1 #41
-                                            'Mail2_Addr',#mail address2 #42
-                                            'MCity', # Mailing City     #43
-                                            'MZip',  # Mailing Zip      #44
-                                            'Land_Value',# land value   #45
-                                            'Improv_Val',# improvedvalue#46
-                                            'LU',    # land use code    #47
-                                            'Total_DWUnits',  # units   #48
-                              
+        with arcpy.da.UpdateCursor(carsonParcel, [
+            'APN_TRPA', 'PPNO_TRPA', 'JURISDICTION_TRPA', 'HSE_NUMBR_TRPA', 
+            'STR_DIR_TRPA', 'STR_NAME_TRPA', 'STR_SUFFIX_TRPA', 'UNIT_NUMBR_TRPA', 
+            'APO_ADDRESS_TRPA', 'PSTL_TOWN_TRPA', 'PSTL_STATE_TRPA', 'PSTL_ZIP5_TRPA',
+            'OWN_FULL_TRPA', 'MAIL_ADD1_TRPA', 'MAIL_CITY_TRPA', 'MAIL_STATE_TRPA', 
+            'MAIL_ZIP5_TRPA', 'AS_LANDVALUE_TRPA', 'AS_IMPROVALUE_TRPA', 'AS_SUM_TRPA', 
+            'TAX_LANDVALUE_TRPA', 'TAX_IMPROVALUE_TRPA', 'TAX_SUM_TRPA', 'TAX_YEAR_TRPA', 
+            'COUNTY_LANDUSE_CODE_TRPA', 'COUNTY_LANDUSE_TRPA', 'YEAR_BUILT_TRPA', 
+            'UNITS_TRPA', 'BEDROOMS_TRPA', 'BATHROOMS_TRPA', 'BUILDING_SQFT_TRPA', 
+            'VHR_TRPA', 'HOA_TRPA', 'APN', 'APN_NUM', 'Phy_Addr', 'Loc1', 'Dir', 
+            'Street_Name', 'Unit', 'Legal_Owner', 'Mail_Addr', 'Mail2_Addr', 'MCity', 
+            'MZip', 'Land_Value', 'Improv_Val', 'LU', 'Total_DWUnits'
+        ]) as cursor:
+            for row in cursor:
+                # Set APN
+                apn = row[cursor.fields.index('APN')]
+                row[cursor.fields.index('APN_TRPA')] = (apn[:3] + "-" + apn[3:6] + "-" + apn[6:8]) if apn else ''
 
-    ]) as cursor:
-        # loop through each record and transform the values
-        for row in cursor:
-            # Set APN
-            apn = row[33]
-            if not (apn is None or apn == "" or apn.isspace() == True):
-                row[0] = (apn[:3] + "-" + apn[3:6] + "-" + apn[6:8])
-            else:
-                row[0] = ''
-                
-            #PPNO
-            ppno = row[34]
-            if not (ppno is None):
-                row[1] = int(ppno)
-            else:
-                row[1] = ''
-                
-            # Jurisdiction
-            row[2] = "CC"
-            
-            # APO Address
-            full_address = row[35]
-            if not (full_address is None or full_address=='' or full_address.isspace()==True):
-                row[8] = full_address
-            else:
-                row[8] = ''
-            
-            # House Number
-            house = row[36]
-            if not (house is None):
-                row[3] = str(house)
-            else:
-                row[3] = ''
-            
-            # Street Direction
-            street_direction = row[37]
-            if not (street_direction is None or street_direction=='' or street_direction.isspace()==True):
-                row[4] = street_direction
-            else:
-                row[4] = ''
-                
-            # Street Name
-            street_name = row[38]
-            if not (street_name is None or street_name =='' or street_name.isspace()==True):
-                row[5] = street_name.split(" ",-1)[0]
-            else:
-                row[5] = ''
-                
-            # Street Suffix
-            street_suffix = row[38]
-            if not (street_suffix is None or street_suffix =='' or street_suffix.isspace()==True):
-                row[6] = street_suffix.split(" ")[-1]
-            else:
-                row[6] = ''
-                
-            # Unit Number
-            unit= row[39]
-            if not (unit is None or unit=='' or unit.isspace()==True):
-                row[7] = unit
-            else:
-                row[7] = ''
-                        
-            # Postal Town - see Search/Update Cursor below
-            
-            # Postal State
-            row[10] = 'NV'
-            
-            # Postal Zip - See Search/Update Cursor below
-            row[11] = ''    
-            
-            # Owner Name
-            owner = row[40]
-            if not (owner is None or owner == '' or owner.isspace()==True):
-                row[12] = owner.strip()
-            else:
-                row[12] = ''
+                # Set PPNO
+                ppno = row[cursor.fields.index('APN_NUM')]
+                row[cursor.fields.index('PPNO_TRPA')] = int(ppno) if ppno else ''
 
-            # Mailing Address
-            address1 = row[41]
-            address2 = row[42]
-            if not (address2 is None or address2 == '' or address2.isspace()==True):
-                row[13] = str(address2).strip()
-            elif (address2 is None or address2 == '' or address2.isspace()==True and address1 is None or address1 == '' or address1.isspace()==True):
-                row[13] = str(address1).strip()
-            else:
-                row[13] = '' 
-            
-            # Mailing City
-            mail_city = row[43]        
-    #         mail_city.split(',',1)[0]
-            if not (mail_city is None or mail_city=='' or mail_city.isspace()==True):
-                row[14] = mail_city.strip().split(',',1)[0].strip()
-            else:
-                row[14] = ''
-                
-            # Mailing State
-            mail_state = row[43]
-            if not (mail_state is None or mail_state=='' or mail_state.isspace()==True):
-                #row[15] = mail_state.strip().rsplit(',')[-1].strip()
-                row[15] = mail_state.strip().rsplit(',')[-1].strip()[:2]
-                #todo: trim to 2 chars
-            else:
-                row[15] = ''
-            
-            # Mailing Zipcode
-            mail_zip = row[44] 
-            if (mail_zip is not None and len(mail_zip)>=5):
-                row[16] = mail_zip[:5]
-            else:
-                row[16] = ''
-                
-            # Assessed Land Value
-            land_value = row[45]
-            if not(land_value is None):
-                row[17] = land_value
-            else:
-                row[17] = 0
-            
-            # Assessed Improved Value
-            improved_value = row[46]
-            if not (improved_value is None):
-                row[18] = improved_value
-            else:
-                row[18] = 0
-                    
-            # Assessed Sum
-            if not (land_value is None or improved_value is None):
-                assessed_sum = improved_value + land_value
-                row[19] = assessed_sum
-            else:
-                row[19] = None
-            
-            # Tax  Land Value
-            taxland_value = row[45]
-            if not(taxland_value is None):
-                row[20] = taxland_value/0.35
-            else:
-                row[20] = None
-            
-            # Tax Improved Value
-            taximproved_value = row[46]
-            if not (taximproved_value is None):
-                row[21] = taximproved_value/0.35
-            else:
-                row[21] = None
-            
-            # Tax Sum
-            if not (land_value is None or improved_value is None):
-                tax_sum = row[20]+row[21]
-                row[22] = tax_sum
-            else:
-                row[22] = None
-            
-            # Tax Year
-            tax_year =  datetime.datetime.now().year
+                # Jurisdiction
+                row[cursor.fields.index('JURISDICTION_TRPA')] = "CC"
 
-            if not (tax_year is None):
-                row[23] = tax_year
-            else:
-                row[23] = ''
-                
-            # County Land Use Code
-            county_luc = row[47]
-            if not (county_luc is None):
+                # APO Address
+                full_address = row[cursor.fields.index('Phy_Addr')]
+                row[cursor.fields.index('APO_ADDRESS_TRPA')] = full_address if full_address else ''
 
-                row[24] = str(county_luc)
-            else:
-                row[24] = '' 
-                
-            # Units
-            units = row[48]
-            if not (units is None):
-                row[27] = units
-            else:
-                row[27] = None
-         
-    #         Update the row.
-            cursor.updateRow(row)
-    del cursor
+                # House Number
+                house = row[cursor.fields.index('Loc1')]
+                row[cursor.fields.index('HSE_NUMBR_TRPA')] = str(house) if house else ''
 
-    #arcpy.management.CopyFeatures(carsonParcel, parcel_out)
+                # Street Direction
+                street_direction = row[cursor.fields.index('Dir')]
+                row[cursor.fields.index('STR_DIR_TRPA')] = street_direction if street_direction else ''
 
-    out_coordinate_system = arcpy.SpatialReference('NAD 1983 UTM Zone 10N') 
-    arcpy.Project_management(carsonParcel, parcel_out, out_coordinate_system)
+                # Street Name and Suffix
+                street_name = row[cursor.fields.index('Street_Name')]
+                if street_name:
+                    parts = street_name.split(" ")
+                    row[cursor.fields.index('STR_NAME_TRPA')] = parts[0]
+                    row[cursor.fields.index('STR_SUFFIX_TRPA')] = parts[-1]
+                else:
+                    row[cursor.fields.index('STR_NAME_TRPA')] = ''
+                    row[cursor.fields.index('STR_SUFFIX_TRPA')] = ''
 
-    print('New Carson Parcels transformed')
-    logger.info('New Carson Parcels transformed')
+                # Unit Number
+                unit = row[cursor.fields.index('Unit')]
+                row[cursor.fields.index('UNIT_NUMBR_TRPA')] = unit if unit else ''
+
+                # Postal State
+                row[cursor.fields.index('PSTL_STATE_TRPA')] = 'NV'
+
+                # Owner Name
+                owner = row[cursor.fields.index('Legal_Owner')]
+                row[cursor.fields.index('OWN_FULL_TRPA')] = owner.strip() if owner else ''
+
+                # Mailing Address
+                address1 = row[cursor.fields.index('Mail_Addr')]
+                address2 = row[cursor.fields.index('Mail2_Addr')]
+                row[cursor.fields.index('MAIL_ADD1_TRPA')] = address2.strip() if address2 else address1.strip() if address1 else ''
+
+                # Mailing City
+                mail_city = row[cursor.fields.index('MCity')]
+                row[cursor.fields.index('MAIL_CITY_TRPA')] = mail_city.split(',', 1)[0].strip() if mail_city else ''
+
+                # Mailing State
+                mail_state = row[cursor.fields.index('MCity')]
+                row[cursor.fields.index('MAIL_STATE_TRPA')] = mail_state.split(',')[-1].strip()[:2] if mail_state else ''
+
+                # Mailing Zip
+                mail_zip = row[cursor.fields.index('MZip')]
+                row[cursor.fields.index('MAIL_ZIP5_TRPA')] = mail_zip[:5] if mail_zip and len(mail_zip) >= 5 else ''
+
+                # Assessed Land Value
+                land_value = row[cursor.fields.index('Land_Value')]
+                row[cursor.fields.index('AS_LANDVALUE_TRPA')] = land_value if land_value else 0
+
+                # Assessed Improved Value
+                improved_value = row[cursor.fields.index('Improv_Val')]
+                row[cursor.fields.index('AS_IMPROVALUE_TRPA')] = improved_value if improved_value else 0
+
+                # Assessed Sum
+                row[cursor.fields.index('AS_SUM_TRPA')] = (land_value or 0) + (improved_value or 0)
+
+                # Tax Values
+                row[cursor.fields.index('TAX_LANDVALUE_TRPA')] = (land_value / 0.35) if land_value else None
+                row[cursor.fields.index('TAX_IMPROVALUE_TRPA')] = (improved_value / 0.35) if improved_value else None
+                row[cursor.fields.index('TAX_SUM_TRPA')] = ((land_value or 0) / 0.35) + ((improved_value or 0) / 0.35)
+
+                # Tax Year
+                row[cursor.fields.index('TAX_YEAR_TRPA')] = datetime.datetime.now().year
+
+                # County Land Use Code
+                county_luc = row[cursor.fields.index('LU')]
+                row[cursor.fields.index('COUNTY_LANDUSE_CODE_TRPA')] = str(county_luc) if county_luc else ''
+
+                # Units
+                units = row[cursor.fields.index('Total_DWUnits')]
+                row[cursor.fields.index('UNITS_TRPA')] = units if units else None
+
+                # Update the row
+                cursor.updateRow(row)
+        del cursor
+    
+        out_coordinate_system = arcpy.SpatialReference('NAD 1983 UTM Zone 10N') 
+        arcpy.Project_management(carsonParcel, parcel_out, out_coordinate_system)
+
+        print('New Carson Parcels transformed')
+        logger.info('New Carson Parcels transformed')
     #-------------------------------------------------------------------------------------
     ## DOUGLAS TRANSFORM
     #-------------------------------------------------------------------------------------
     # get staging feature class and name output trnasformed feature class
-    in_features = "Parcel_DG_Extracted"
-    parcel_out  = "Parcel_DG_Transformed"
+    county_to_check = 'Douglas'
+    exists = is_county_in_list(county_to_check, counties_to_run)
+    print(f"Is {county_to_check} in the list? {exists}")
+    
+    if exists == 1:
+        in_features = "Parcel_DG_Extracted"
+        parcel_out  = "Parcel_DG_Transformed"
 
-    # in-memory feature class
-    douglasParcel = r"in_memory/inMemoryFeatureClass"
+        # in-memory feature class
+        douglasParcel = r"in_memory/inMemoryFeatureClass"
 
-    # copy feature class into in-memory feature class to work on
-    arcpy.management.CopyFeatures(in_features, douglasParcel)
+        # copy feature class into in-memory feature class to work on
+        arcpy.management.CopyFeatures(in_features, douglasParcel)
 
-    # Add TRPA base fields
-    arcpy.management.AddFields(douglasParcel, baseFields)
+        # Add TRPA base fields
+        arcpy.management.AddFields(douglasParcel, baseFields)
+        
+        # Define the fields in a list variable
+        fields = [
+            ## TRPA base schema ##
+            'APN_TRPA',                 #0
+            'PPNO_TRPA',                #1
+            'JURISDICTION_TRPA',        #2
+            # parcel address   
+            'HSE_NUMBR_TRPA',           #3
+            'STR_DIR_TRPA',             #4
+            'STR_NAME_TRPA',            #5
+            'STR_SUFFIX_TRPA',          #6
+            'UNIT_NUMBR_TRPA',          #7
+            'APO_ADDRESS_TRPA',         #8
+            'PSTL_TOWN_TRPA',           #9
+            'PSTL_STATE_TRPA',          #10
+            'PSTL_ZIP5_TRPA',           #11
+            # owner fields
+            # no own first and last for DG
+            'OWN_FULL_TRPA',            #12
+            'MAIL_ADD1_TRPA',           #13
+            'MAIL_CITY_TRPA',           #14
+            'MAIL_STATE_TRPA',          #15
+            'MAIL_ZIP5_TRPA',           #16
+            # value fields  
+            'AS_LANDVALUE_TRPA',        #17
+            'AS_IMPROVALUE_TRPA',       #18
+            'AS_SUM_TRPA',              #19
+            'TAX_LANDVALUE_TRPA',       #20 
+            'TAX_IMPROVALUE_TRPA',      #21
+            'TAX_SUM_TRPA',             #22
+            'TAX_YEAR_TRPA',            #23
+            # land use fields 
+            'COUNTY_LANDUSE_CODE_TRPA', #24
+            'COUNTY_LANDUSE_TRPA',      #25
+            # Fields for building info
+            "YEAR_BUILT_TRPA",          #26
+            'UNITS_TRPA',               #27
+            'BEDROOMS_TRPA',            #28
+            'BATHROOMS_TRPA',           #29
+            'BUILDING_SQFT_TRPA',       #30
+            'VHR_TRPA',                 #31
+            'HOA_TRPA',                 #32
+            ###-------------------------###
+            # County Fields to get data from
+            'APN',                      #33
+            'PLOC_',                    #34
+            'PLOCDR',                   #35
+            'PLOCNM',                   #36
+            'PLOCTP',                   #37
+            'PLOCU_',                   #38
+            'PANAME',                   #39
+            'PMADD1',                   #40
+            'PMADD2',                   #41
+            'PMCTST',                   #42
+            'PZIP',                     #43
+            'YYEAR',                    #44
+            'YLDUSE',                   #45
+            'YLANDV',                   #46
+            'YIMPRV',                   #47
+            'YEXMP',                    #48
+            'YNETV',                    #49
+            'PCONYR',                   #50
+            'PBEDS',                    #51
+            'PBATHS']                   #52
 
-
-    # Do work.
-    with arcpy.da.UpdateCursor(douglasParcel, [
-                                            ## TRPA base schema ##
-                                            'APN_TRPA',                 #0
-                                            'PPNO_TRPA',                #1
-                                            'JURISDICTION_TRPA',        #2
-                                            # parcel address   
-                                            'HSE_NUMBR_TRPA',           #3
-                                            'STR_DIR_TRPA',             #4
-                                            'STR_NAME_TRPA',            #5
-                                            'STR_SUFFIX_TRPA',          #6
-                                            'UNIT_NUMBR_TRPA',          #7
-                                            'APO_ADDRESS_TRPA',         #8
-                                            'PSTL_TOWN_TRPA',           #9
-                                            'PSTL_STATE_TRPA',          #10
-                                            'PSTL_ZIP5_TRPA',           #11
-                                            # owner fields
-                                                # no own first and last for DG
-                                            'OWN_FULL_TRPA',            #12
-                                            'MAIL_ADD1_TRPA',           #13
-                                            'MAIL_CITY_TRPA',           #14
-                                            'MAIL_STATE_TRPA',          #15
-                                            'MAIL_ZIP5_TRPA',           #16
-                                            # value fields  
-                                            'AS_LANDVALUE_TRPA',        #17
-                                            'AS_IMPROVALUE_TRPA',       #18
-                                            'AS_SUM_TRPA',              #19
-                                            'TAX_LANDVALUE_TRPA',       #20 
-                                            'TAX_IMPROVALUE_TRPA',      #21
-                                            'TAX_SUM_TRPA',             #22
-                                            'TAX_YEAR_TRPA',            #23
-                                            # land use fields 
-                                            'COUNTY_LANDUSE_CODE_TRPA', #24
-                                            'COUNTY_LANDUSE_TRPA',      #25
-                                            # Fields for building info
-                                            "YEAR_BUILT_TRPA",          #26
-                                            'UNITS_TRPA',               #27
-                                            'BEDROOMS_TRPA',            #28
-                                            'BATHROOMS_TRPA',           #29
-                                            'BUILDING_SQFT_TRPA',       #30
-                                            'VHR_TRPA',                 #31
-                                            'HOA_TRPA',                 #32
-                                            ###-------------------------###
-                                            # County Fields to get data from
-                                            'APN',   # apn,ppno         #33
-                                            'PLOC_', # house number     #34
-                                            'PLOCDR',# street dir       #35
-                                            'PLOCNM',# street name      #36
-                                            'PLOCTP',# street suffix    #37
-                                            'PLOCU_',# unit number      #38
-                                            'PANAME',# owner name       #39
-                                            'PMADD1',# mailing addr1    #40
-                                            'PMADD2',# mailing addr2    #41
-                                            'PMCTST',# city,state       #42
-                                            'PZIP',  # zip              #43
-                                            'YYEAR', # tax year         #44
-                                            'YLDUSE',# land use code    #45
-                                            'YLANDV',# land value       #46
-                                            'YIMPRV',# improved value   #47
-                                            'YEXMP', # tax exempt value #48
-                                            'YNETV', # tax net value    #49
-                                            'PCONYR',# year built       #50
-                                            'PBEDS', # bedrooms         #51
-                                            'PBATHS',# bathrooms        #52
-
-        ### These are missing from the new service
-        #                                         'PBLDSF',# building sqft    #
-        #                                         'STREETADDR', #full adr     #
-        #                                         'P_DWEL',# units            #
-        #                                         'VHR',   # vhr yes?         #
-        #                                         'HOA',   # hoa name         #
-    ]) as cursor:
-        # loop through each record and transform the values
-        for row in cursor:
-            # APN field
-            # Get County value
-            apn = str(row[33])
-            if not (apn is None or apn == ""):
-                row[0] =(apn[:4] + "-" + apn[4:6] + "-" + apn[6:9] + "-" + apn[9:12])
-            else:
-                row[0] = ""
+        with arcpy.da.UpdateCursor(douglasParcel, fields) as cursor:
+            # loop through each record and transform the values
+            for row in cursor:
+                # APN field
+                # Get County value
+                apn = str(row[33])
+                if not (apn is None or apn == ""):
+                    row[0] =(apn[:4] + "-" + apn[4:6] + "-" + apn[6:9] + "-" + apn[9:12])
+                else:
+                    row[0] = ""
+                    
+                #PPNO
+                ppno = row[33]
+                if not (ppno is None):
+                    row[1] = int(ppno)
+                else:
+                    row[1] = ''
+                    
+                # Jurisdiction
+                row[2] = "DG"
                 
-            #PPNO
-            ppno = row[33]
-            if not (ppno is None):
-                row[1] = int(ppno)
-            else:
-                row[1] = ''
+                # APO Address
+                house            = str(row[34]).strip()
+                street_direction = str(row[35]).strip()
+                street_name      = str(row[36]).strip()
+                street_suffix    = str(row[37]).strip()
+                unit             = str(row[38]).strip()
+                if not (street_name is None or street_name=='' or street_name.isspace()==True):
+                    row[8] = re.sub(" +"," ", (house + " " + street_direction +" " + street_name+" " + street_suffix+" " + unit).strip())
+                else:
+                    row[8] = ''
                 
-            # Jurisdiction
-            row[2] = "DG"
+                # House Number
+                house = row[34]
+                if not (house is None):
+                    row[3] = str(house)
+                else:
+                    row[3] = ''
+                
+                # Street Direction
+                street_direction = row[35]
+                if not (street_direction is None or street_direction=='' or street_direction.isspace()==True):
+                    row[4] = street_direction
+                else:
+                    row[4] = ''
+                    
+                # Street Name
+                street_name = row[36]
+                if not (street_name is None or street_name =='' or street_name.isspace()==True):
+                    row[5] = street_name
+                else:
+                    row[5] = ''
+                    
+                # Street Suffix
+                street_suffix = row[37]
+                if not (street_suffix is None or street_suffix =='' or street_suffix.isspace()==True):
+                    row[6] = street_suffix
+                else:
+                    row[6] = ''
+                    
+                # Unit Number
+                unit= row[38]
+                if not (unit is None or unit=='' or unit.isspace()==True):
+                    row[7] = unit
+                else:
+                    row[7] = ''
+                            
+                # Postal Town - see Search/Update Cursor below
+                
+                # Postal State
+                row[10] = 'NV'
+                
+                # Postal Zip - See Search/Update Cursor below
+                row[11] = ''    
+                
+                # Owner Name
+                owner = row[39]
+                if not (owner is None or owner == '' or owner.isspace()==True):
+                    row[12] = owner.strip()
+                else:
+                    row[12] = ""
             
-            # APO Address
-            house            = str(row[34]).strip()
-            street_direction = str(row[35]).strip()
-            street_name      = str(row[36]).strip()
-            street_suffix    = str(row[37]).strip()
-            unit             = str(row[38]).strip()
-            if not (street_name is None or street_name=='' or street_name.isspace()==True):
-                row[8] = re.sub(" +"," ", (house + " " + street_direction +" " + street_name+" " + street_suffix+" " + unit).strip())
-            else:
-                row[8] = ''
-            
-            # House Number
-            house = row[34]
-            if not (house is None):
-                row[3] = str(house)
-            else:
-                row[3] = ''
-            
-            # Street Direction
-            street_direction = row[35]
-            if not (street_direction is None or street_direction=='' or street_direction.isspace()==True):
-                row[4] = street_direction
-            else:
-                row[4] = ''
-                
-            # Street Name
-            street_name = row[36]
-            if not (street_name is None or street_name =='' or street_name.isspace()==True):
-                row[5] = street_name
-            else:
-                row[5] = ''
-                
-            # Street Suffix
-            street_suffix = row[37]
-            if not (street_suffix is None or street_suffix =='' or street_suffix.isspace()==True):
-                row[6] = street_suffix
-            else:
-                row[6] = ''
-                
-            # Unit Number
-            unit= row[38]
-            if not (unit is None or unit=='' or unit.isspace()==True):
-                row[7] = unit
-            else:
-                row[7] = ''
+                # Mailing Address
+                address1 = row[40]
+                address2 = row[41]
+                if address1 and address2:  # Both values are non-empty and not None
+                    row[13] = f"{address1} {address2}"
+                elif address1:  # Only address1 is valid
+                    row[13] = address1
+                else:  # Neither address1 nor address2 is valid
+                    row[13] = ''
                         
-            # Postal Town - see Search/Update Cursor below
-            
-            # Postal State
-            row[10] = 'NV'
-            
-            # Postal Zip - See Search/Update Cursor below
-            row[11] = ''    
-            
-            # Owner Name
-            owner = row[39]
-            if not (owner is None or owner == '' or owner.isspace()==True):
-                row[12] = owner.strip()
-            else:
-                row[12] = ""
-
-            # Mailing Address
-            address1 = row[40].strip()
-            address2 = row[41].strip()
-            if not (address1 is None or address1=='' or address1.isspace()==True):
-                row[13] = str(address1 + " " + address2)
-            elif (address2 is None):
-                row[13] = address1
-            else:
-                row[13] = ''
+                # Mailing City
+                mail_city = str(row[42]).split(',',1)[0].strip()
+                
+                if not (mail_city is None or mail_city=='' or mail_city.isspace()==True):
+                    row[14] = mail_city
+                else:
+                    row[14] = ''
                     
-            # Mailing City
-            mail_city = str(row[42]).split(',',1)[0].strip()
-            
-            if not (mail_city is None or mail_city=='' or mail_city.isspace()==True):
-                row[14] = mail_city
-            else:
-                row[14] = ''
+                # Mailing State - Added logic to set anything that isn't 2 characters long to '' 
+                mail_state = str(row[42]).rsplit(',')[-1].strip().split(' ',1)[0].strip()
+                if not (mail_state is None or mail_state=='' or mail_state.isspace()==True or len(mail_state)!=2):
+                    row[15] = mail_state[:2]
+                else:
+                    row[15] = ''
                 
-            # Mailing State - Added logic to set anything that isn't 2 characters long to '' 
-            mail_state = str(row[42]).rsplit(',')[-1].strip().split(' ',1)[0].strip()
-            if not (mail_state is None or mail_state=='' or mail_state.isspace()==True or len(mail_state)!=2):
-                #row[15] = mail_state
-                row[15] = mail_state[:2]
-            else:
-                row[15] = ''
-            
-            # Mailing Zipcode
-            mail_zip = row[43].strip()
-            if not (mail_zip is None or mail_zip=='' or mail_zip.isspace()==True):
-                row[16] = mail_zip[:5]
-            else:
-                row[16] = ''
-                
-            # Assessed Land Value
-            land_value = row[46]
-            if not(land_value is None):
-                row[17] = land_value
-            else:
-                row[17] = ''
-            
-            # Assessed Improved Value
-            improved_value = row[47]
-            if not (improved_value is None):
-                row[18] = improved_value
-            else:
-                row[18] = None
+                # Mailing Zipcode
+                #mail_zip = row[43].strip()
+                mail_zip = row[43]
+                if not (mail_zip is None or mail_zip=='' or mail_zip.isspace()==True):
+                    row[16] = mail_zip[:5]
+                else:
+                    row[16] = ''
                     
-            # Assessed Sum
-            if not (land_value is None or improved_value is None):
-                assessed_sum = improved_value + land_value
-                row[19] = assessed_sum
-            else:
-                row[19] = None
-            
-            # Tax  Land Value
-            taxland_value = row[46]
-            if not(taxland_value is None):
-                row[20] = taxland_value/0.35
-            else:
-                row[20] = None
-            
-            # Tax Improved Value
-            taximproved_value = row[47]
-            if not (taximproved_value is None):
-                row[21] = taximproved_value/0.35
-            else:
-                row[21] = None
-            
-            # Tax Sum
-            if not (land_value is None or improved_value is None):
-                tax_sum = row[49]
-                row[22] = tax_sum
-            else:
-                row[22] = None
-            
-            # Tax Year
-            tax_year = row[44]
-            if not (tax_year is None):
-                row[23] = tax_year
-            else:
-                row[23] = ''
+                # Assessed Land Value
+                land_value = row[46]
+                if not(land_value is None):
+                    row[17] = land_value
+                else:
+                    row[17] = ''
                 
-            # County Land Use Code
-            county_luc = row[45]
-            if not (county_luc is None):
-                row[24] = str(county_luc)
-            else:
-                row[24] = '' 
-            
-            # Year Built
-            year_built = row[50]
-            if not (year_built is None or year_built==''):
-                row[26] = year_built
-            else:
-                row[26] = None
-            
-            # Bedrooms
-            bedrooms = row[51]
-            if not (bedrooms is None or bedrooms==''):
-                row[28] = bedrooms
-            else:
-                row[28] = None
-            # Bathrooms
-            baths = row[52]
-            if not (baths is None or baths==''):
-                row[29] = baths
-            else:
-                row[29] = None
+                # Assessed Improved Value
+                improved_value = row[47]
+                if not (improved_value is None):
+                    row[18] = improved_value
+                else:
+                    row[18] = None
+                        
+                # Assessed Sum
+                if not (land_value is None or improved_value is None):
+                    assessed_sum = improved_value + land_value
+                    row[19] = assessed_sum
+                else:
+                    row[19] = None
                 
-    #         Update the row.
-            cursor.updateRow(row)
-    del cursor
+                # Tax  Land Value
+                taxland_value = row[46]
+                if not(taxland_value is None):
+                    row[20] = taxland_value/0.35
+                else:
+                    row[20] = None
+                
+                # Tax Improved Value
+                taximproved_value = row[47]
+                if not (taximproved_value is None):
+                    row[21] = taximproved_value/0.35
+                else:
+                    row[21] = None
+                
+                # Tax Sum
+                if not (land_value is None or improved_value is None):
+                    tax_sum = row[49]
+                    row[22] = tax_sum
+                else:
+                    row[22] = None
+                
+                # Tax Year
+                tax_year = row[44]
+                if not (tax_year is None):
+                    row[23] = tax_year
+                else:
+                    row[23] = ''
+                    
+                # County Land Use Code
+                county_luc = row[45]
+                if not (county_luc is None):
+                    row[24] = str(county_luc)
+                else:
+                    row[24] = '' 
+                
+                # Year Built
+                year_built = row[50]
+                if not (year_built is None or year_built==''):
+                    row[26] = year_built
+                else:
+                    row[26] = None
+                
+                # Bedrooms
+                bedrooms = row[51]
+                if not (bedrooms is None or bedrooms==''):
+                    row[28] = bedrooms
+                else:
+                    row[28] = None
+                # Bathrooms
+                baths = row[52]
+                if not (baths is None or baths==''):
+                    row[29] = baths
+                else:
+                    row[29] = None
+                    
+        #         Update the row.
+                cursor.updateRow(row)
+        del cursor
 
-    out_coordinate_system = arcpy.SpatialReference('NAD 1983 UTM Zone 10N') 
-    arcpy.Project_management(douglasParcel, parcel_out, out_coordinate_system)
+        out_coordinate_system = arcpy.SpatialReference('NAD 1983 UTM Zone 10N') 
+        arcpy.Project_management(douglasParcel, parcel_out, out_coordinate_system)
 
-    print('New Douglas Parcels transformed')
-    logger.info('New Douglas Parcels Transformed')
+        print('New Douglas Parcels transformed')
+        logger.info('New Douglas Parcels Transformed')
     #-------------------------------------------------------------------------------------------
     # ELDORADO TRANSFORM
     #-------------------------------------------------------------------------------------------
     # get staging feature class to transform
-    in_features = "Parcel_EL_Extracted"
-    parcel_out  = "Parcel_EL_Transformed"
+    county_to_check = 'El Dorado'
+    exists = is_county_in_list(county_to_check, counties_to_run)
+    print(f"Is {county_to_check} in the list? {exists}")
+    
+    if exists == 1:
+        in_features = "Parcel_EL_Extracted"
+        parcel_out  = "Parcel_EL_Transformed"
 
-    # in-memory feature class
-    eldoradoParcel = r"in_memory/inMemoryFeatureClass"
+        # in-memory feature class
+        eldoradoParcel = r"in_memory/inMemoryFeatureClass"
 
-    # copy feature class into in-memory feature class to work on
-    arcpy.management.CopyFeatures(in_features, eldoradoParcel)
+        # copy feature class into in-memory feature class to work on
+        arcpy.management.CopyFeatures(in_features, eldoradoParcel)
 
-    # Add TRPA base fields
-    arcpy.management.AddFields(eldoradoParcel, baseFields)
+        # Add TRPA base fields
+        arcpy.management.AddFields(eldoradoParcel, baseFields)
 
-    # Set up the regex queries for the data.
-    # cityStateZipRegex = r'(.+?)\s([A-Z]{1,2})\s(.+?)$' - Keep in case new one doesn't work out long term.
-    cityStateZipRegex = r'(.+?)\s([A-Z]{1,2})\s(?=\d)(.*)'
-    poBoxRegex = r'([^x]+)\W(P\s*O BOX\W*[0-9]{1,6})'
-    addressRegex = r'(\d{1,5}\D+.+)'
-    canadaRegex = r'(.+?)\s([A-Z]{1,2})\s(CANADA)\s(.*)'
-    brazilRegex = r'(.+?)\s(BRAZIL)\s(.*)'
+        # Set up the regex queries for the data.
+        # cityStateZipRegex = r'(.+?)\s([A-Z]{1,2})\s(.+?)$' - Keep in case new one doesn't work out long term.
+        cityStateZipRegex = r'(.+?)\s([A-Z]{1,2})\s(?=\d)(.*)'
+        poBoxRegex = r'([^x]+)\W(P\s*O BOX\W*[0-9]{1,6})'
+        addressRegex = r'(\d{1,5}\D+.+)'
+        canadaRegex = r'(.+?)\s([A-Z]{1,2})\s(CANADA)\s(.*)'
+        brazilRegex = r'(.+?)\s(BRAZIL)\s(.*)'
 
-    # Set up list for addresses with a country name in the mail_addr4 column.
-    countriesList = ['japan','canada', 'australia']
-
-    # Transform County data to TRPA Schema
-    with arcpy.da.UpdateCursor(eldoradoParcel, [
-                                            ## TRPA base schema ##
-                                            'APN_TRPA',                 #0
-                                            'PPNO_TRPA',                #1
-                                            'JURISDICTION_TRPA',        #2
-                                            # parcel address   
-                                            'HSE_NUMBR_TRPA',           #3
-                                            'STR_DIR_TRPA',             #4
-                                            'STR_NAME_TRPA',            #5
-                                            'STR_SUFFIX_TRPA',          #6
-                                            'UNIT_NUMBR_TRPA',          #7
-                                            'APO_ADDRESS_TRPA',         #8
-                                            'PSTL_TOWN_TRPA',           #9
-                                            'PSTL_STATE_TRPA',          #10
-                                            'PSTL_ZIP5_TRPA',           #11
-                                            # owner fields
-                                                # no first and last fields
-                                            'OWN_FULL_TRPA',            #12
-                                            'MAIL_ADD1_TRPA',           #13
-                                            'MAIL_CITY_TRPA',           #14
-                                            'MAIL_STATE_TRPA',          #15
-                                            'MAIL_ZIP5_TRPA',           #16
-                                            # value fields  
-                                            'AS_LANDVALUE_TRPA',        #17
-                                            'AS_IMPROVALUE_TRPA',       #18
-                                            'AS_SUM_TRPA',              #19
-                                            'TAX_LANDVALUE_TRPA',       #20 
-                                            'TAX_IMPROVALUE_TRPA',      #21
-                                            'TAX_SUM_TRPA',             #22
-                                            'TAX_YEAR_TRPA',            #23
-                                            # land use fields 
-                                            'COUNTY_LANDUSE_CODE_TRPA', #24
-                                            'COUNTY_LANDUSE_TRPA',      #25
-                                            # Fields for building info
-                                            "YEAR_BUILT_TRPA",          #26
-                                            'UNITS_TRPA',               #27
-                                            'BEDROOMS_TRPA',            #28
-                                            'BATHROOMS_TRPA',           #29
-                                            'BUILDING_SQFT_TRPA',       #30
-                                            'VHR_TRPA',                 #31
-                                            'HOA_TRPA',                 #32
-                                            ###-------------------------###
-                                            # County Fields to get data from
-                                            'PRCL_ID',                  #33
-                                            'OWNER_NAME',               #34
-                                            'MAIL_ADDR1',               #35
-                                            'MAIL_ADDR2',               #36
-                                            'MAIL_ADDR3',               #37
-                                            'MAIL_ADDR4',               #38
-                                            'ADDRSTNBR',                #39
-                                            'ADDRSTDIR',                #40
-                                            'ADDRSTNAME',               #41
-                                            'ADDRSTTYPE',               #42
-                                            'ADDRUNITNB',               #43
-                                            'PRCL_ADDR',                #44
-                                            'USECD_1',                  #45
-                                            'USECDLIT_1',               #46
-                                            'STRUCT_VAL',               #47
-                                            'LAND_VAL',                 #48
-                                            'YR_BUILT',                 #49
-                                            'DWELLUNITS',               #50
-                                            'BEDROOMS',                 #51
-                                            'ADDRSTPRFX'                 #52
-    ]) as cursor:
-        # transform each row
-        for row in cursor:   
-            # Set APN
-            apn = row[33]
-            if not (apn is None or apn == "" or apn.isspace() == True or 'UN' in apn):
-                row[0] = (apn[:3] + "-" + apn[3:6] + "-" + apn[6:9])
-            else:
-                row[0] = ''
-                
-            # Set PPNO
-            ppno = row[33]
-            if not (apn is None or apn == "" or apn.isspace() == True or 'UN' in apn or 'NP' in apn):
-                try:
-                    row[1] = float(ppno)
-                except ValueError:
-                    row[1] = 0
-            else:
-                row[1] = 0
-            # Set County
-            row[2] = 'EL'
-            
-            # APO Address
-            full_address = row[44]
-            if not (full_address is None or full_address=='' or full_address.isspace()==True):
-                
-                row[8] = full_address
-            else:
-                row[8] = ''
-            
-            # House Number
-            house = row[39]
-            if not (house is None):
-                # convert house number to integer type
-                row[3] = str(int(house))
-            else:
-                row[3] = ''
-            
-            # Street Direction
-            street_direction = row[40]
-            if not (street_direction is None or street_direction=='' or street_direction.isspace()==True
-                    or street_direction == 'UNASSIGNED'):
-                # get the first character
-                row[4] = street_direction[0]
-            else:
-                row[4] = ''
-                
-            # Street Name
-            street_name = row[41]
-            street_prefix = row[52]
-            if not (street_name is None or street_name =='' or street_name.isspace()==True):
-                if not (street_prefix is None or street_prefix =='' or street_prefix.isspace()==True
-                    or street_prefix == 'UNASSIGNED'):
-                    row[5]= street_prefix + ' ' + street_name
+        # Set up list for addresses with a country name in the mail_addr4 column.
+        countriesList = ['japan','canada', 'australia', 'brazil', 'mexico', 'germany', 'france', 'england', 'united kingdom', 'uk', 'china', 'russia', 'india', 'south africa', 'nigeria', 'egypt', 'italy', 'spain', 'argentina', 'peru', 'chile', 'colombia', 'venezuela', 'ecuador', 'bolivia', 'paraguay', 'uruguay', 'panama', 'costa rica', 'nicaragua', 'honduras', 'el salvador', 'guatemala', 'belize', 'jamaica', 'haiti', 'dominican republic', 'cuba', 'bahamas', 'bermuda', 'puerto rico', 'us virgin islands', 'british virgin islands', 'anguilla', 'saint kitts and nevis', 'antigua and barbuda', 'saint lucia', 'saint vincent and the grenadines', 'grenada', 'barbados', 'trinidad and tobago', 'guyana', 'suriname', 'french guiana', 'martinique', 'guadeloupe', 'saint barthelemy', 'saint martin', 'sint maarten', 'aruba', 'curacao', 'bonaire', 'saba', 'sint eustatius', 'turks and caicos islands', 'cayman islands', 'anguilla', 'montserrat', 'bermuda', 'saint pierre and miquelon', 'greenland', 'iceland', 'faroe islands', 'norway', 'sweden', 'finland', 'denmark', 'estonia', 'latvia', 'lithuania', 'belarus', 'ukraine', 'moldova', 'romania', 'bulgaria', 'serbia', 'croatia', 'bosnia and herzegovina', 'slovenia', 'hungary', 'slovakia', 'czech republic', 'poland', 'austria', 'switzerland', 'liechtenstein', 'luxembourg', 'netherlands', 'belgium', 'ireland', 'portugal', 'spain', 'andorra', 'monaco', 'france', 'italy']
+        
+        # Transform County data to TRPA Schema
+        with arcpy.da.UpdateCursor(eldoradoParcel, [
+                                                ## TRPA base schema ##
+                                                'APN_TRPA',                 #0
+                                                'PPNO_TRPA',                #1
+                                                'JURISDICTION_TRPA',        #2
+                                                # parcel address   
+                                                'HSE_NUMBR_TRPA',           #3
+                                                'STR_DIR_TRPA',             #4
+                                                'STR_NAME_TRPA',            #5
+                                                'STR_SUFFIX_TRPA',          #6
+                                                'UNIT_NUMBR_TRPA',          #7
+                                                'APO_ADDRESS_TRPA',         #8
+                                                'PSTL_TOWN_TRPA',           #9
+                                                'PSTL_STATE_TRPA',          #10
+                                                'PSTL_ZIP5_TRPA',           #11
+                                                # owner fields
+                                                    # no first and last fields
+                                                'OWN_FULL_TRPA',            #12
+                                                'MAIL_ADD1_TRPA',           #13
+                                                'MAIL_CITY_TRPA',           #14
+                                                'MAIL_STATE_TRPA',          #15
+                                                'MAIL_ZIP5_TRPA',           #16
+                                                # value fields  
+                                                'AS_LANDVALUE_TRPA',        #17
+                                                'AS_IMPROVALUE_TRPA',       #18
+                                                'AS_SUM_TRPA',              #19
+                                                'TAX_LANDVALUE_TRPA',       #20 
+                                                'TAX_IMPROVALUE_TRPA',      #21
+                                                'TAX_SUM_TRPA',             #22
+                                                'TAX_YEAR_TRPA',            #23
+                                                # land use fields 
+                                                'COUNTY_LANDUSE_CODE_TRPA', #24
+                                                'COUNTY_LANDUSE_TRPA',      #25
+                                                # Fields for building info
+                                                "YEAR_BUILT_TRPA",          #26
+                                                'UNITS_TRPA',               #27
+                                                'BEDROOMS_TRPA',            #28
+                                                'BATHROOMS_TRPA',           #29
+                                                'BUILDING_SQFT_TRPA',       #30
+                                                'VHR_TRPA',                 #31
+                                                'HOA_TRPA',                 #32
+                                                ###-------------------------###
+                                                # County Fields to get data from
+                                                'PRCL_ID',                  #33
+                                                'OWNER_NAME',               #34
+                                                'MAIL_ADDR1',               #35
+                                                'MAIL_ADDR2',               #36
+                                                'MAIL_ADDR3',               #37
+                                                'MAIL_ADDR4',               #38
+                                                'ADDRSTNBR',                #39
+                                                'ADDRSTDIR',                #40
+                                                'ADDRSTNAME',               #41
+                                                'ADDRSTTYPE',               #42
+                                                'ADDRUNITNB',               #43
+                                                'PRCL_ADDR',                #44
+                                                'USECD_1',                  #45
+                                                'USECDLIT_1',               #46
+                                                'STRUCT_VAL',               #47
+                                                'LAND_VAL',                 #48
+                                                'YR_BUILT',                 #49
+                                                'DWELLUNITS',               #50
+                                                'BEDROOMS',                 #51
+                                                'ADDRSTPRFX'                 #52
+        ]) as cursor:
+            # transform each row
+            for row in cursor:   
+                # Set APN
+                apn = row[33]
+                if not (apn is None or apn == "" or apn.isspace() == True or 'UN' in apn):
+                    row[0] = (apn[:3] + "-" + apn[3:6] + "-" + apn[6:9])
                 else:
-                    row[5] = street_name
-            else:
-                row[5] = ''
+                    row[0] = ''
+                    
+                # Set PPNO
+                ppno = row[33]
+                if not (apn is None or apn == "" or apn.isspace() == True or 'UN' in apn or 'NP' in apn):
+                    try:
+                        row[1] = float(ppno)
+                    except ValueError:
+                        row[1] = 0
+                else:
+                    row[1] = 0
+                # Set County
+                row[2] = 'EL'
                 
-            # Street Suffix
-            street_suffix = row[42]
-            if not (street_suffix is None or street_suffix =='' or street_suffix.isspace()==True               
-                    or street_direction == 'UNASSIGNED'):
-                row[6] = street_suffix
-            else:
-                row[6] = ''
+                # APO Address
+                full_address = row[44]
+                if not (full_address is None or full_address=='' or full_address.isspace()==True):
+                    
+                    row[8] = full_address
+                else:
+                    row[8] = ''
                 
-            # Unit Number
-            unit= row[43]
-            if not (unit is None or unit=='' or unit.isspace()==True):
-                row[7] = ("#" + str(unit))
-            else:
-                row[7] = ''
-                        
-            # Postal Town - see Search/Update Cursor below
-            row[9] = ''
-            
-            # Postal State
-            row[10] = 'CA'
-            
-            # Postal Zip - See Search/Update Cursor below
-            row[11] = ''    
-            
-            # Set Mailing Owner, Address, City, State, Zip
-            if row[38] != ' ':
-    #             print("Working on MAIL_ADDR4")
-                if row[38] != 'UNKNOWN' and row[38].lower() not in countriesList:
-                    # Parse out city, state, and zip code and assign variables.
-                    cityStateZip = re.search(cityStateZipRegex, str(row[38]))
-                    if cityStateZip is not None:
+                # House Number
+                house = row[39]
+                if not (house is None):
+                    # convert house number to integer type
+                    row[3] = str(int(house))
+                else:
+                    row[3] = ''
+                
+                # Street Direction
+                street_direction = row[40]
+                if not (street_direction is None or street_direction=='' or street_direction.isspace()==True
+                        or street_direction == 'UNASSIGNED'):
+                    # get the first character
+                    row[4] = street_direction[0]
+                else:
+                    row[4] = ''
+                    
+                # Street Name
+                street_name = row[41]
+                street_prefix = row[52]
+                if not (street_name is None or street_name =='' or street_name.isspace()==True):
+                    if not (street_prefix is None or street_prefix =='' or street_prefix.isspace()==True
+                        or street_prefix == 'UNASSIGNED'):
+                        row[5]= street_prefix + ' ' + street_name
+                    else:
+                        row[5] = street_name
+                else:
+                    row[5] = ''
+                    
+                # Street Suffix
+                street_suffix = row[42]
+                if not (street_suffix is None or street_suffix =='' or street_suffix.isspace()==True               
+                        or street_direction == 'UNASSIGNED'):
+                    row[6] = street_suffix
+                else:
+                    row[6] = ''
+                    
+                # Unit Number
+                unit= row[43]
+                if not (unit is None or unit=='' or unit.isspace()==True):
+                    row[7] = ("#" + str(unit))
+                else:
+                    row[7] = ''
+                            
+                # Postal Town - see Search/Update Cursor below
+                row[9] = ''
+                
+                # Postal State
+                row[10] = 'CA'
+                
+                # Postal Zip - See Search/Update Cursor below
+                row[11] = ''    
+                
+                # Set Mailing Owner, Address, City, State, Zip
+                if row[38] != ' ':
+                    #Check MailAddr3 or MailAddr4 for country name
+                    if row[38] != 'UNKNOWN' and row[38].lower() not in countriesList and row[37].lower() not in countriesList:
+                        # Parse out city, state, and zip code and assign variables.
+                        cityStateZip = re.search(cityStateZipRegex, str(row[38]))
+                        if cityStateZip is not None:
+                            city = cityStateZip.group(1)
+                            state = cityStateZip.group(2)
+                            zipCode = cityStateZip.group(3)
+                            country = ''
+                        else:
+                            continue
+                        # Check to see if address starts with PO Box and assign variable.
+                        if str(row[37]).startswith('PO') or str(row[37]).startswith('P O'):
+                            address = str(row[37])
+                        elif "PO BOX" in str(row[37]) or "P O BOX" in str(row[37]) or "P.O. BOX" in str(row[37]):
+                            address = str(row[37])
+
+                        # Parse out address that doesn't have PO Box and assign variable.
+                        else:
+                            add = re.search(addressRegex,str(row[37]))
+                            address = add.group(1)
+
+                        # Assign owner variable.
+                        owner = str(row[34])+' '+str(row[35])+' '+str(row[36])
+                    elif row[38].lower() in countriesList:
+                        country = str(row[38])
+                        state = str(row[37])
+                        city = str(row[36])
+                        address = str(row[35])
+                        owner = str(row[34])
+                        zipCode = ''
+                    elif row[38] == "CANADA": # temporary patch for incorrectly entered Canadian address
+                        canadaZip = re.search(r'[ABCEGHJKLMNPRSTVXY][0-9][ABCEGHJKLMNPRSTVWXYZ] ?[0-9][ABCEGHJKLMNPRSTVWXYZ][0-9]', str(row[3]))
+                        canadaProvZip = re.search(r'(.*?)\s(N[BLSTU]|[AMN]B|[BQ]C|ON|PE|SK)',str(row[36]))
+                        if canadaZip != None:
+                            zipCode = str(canadaZip.group(0))
+                        else:
+                            zipCode =''
+                            address = str(row[35])
+                            city = str(canadaProvZip.group(1))
+                            state = str(canadaProvZip.group(2))
+                            country = str(row[38])
+                    else:
+                        owner = str(row[34])
+                        address = ''
+                        city = ''
+                        state = ''
+                        zipCode = ''
+                        country = ''
+
+                # If mail_addr4 is "empty".
+                elif row[37] != ' ':
+        #             print("Working on MAIL_ADDR3")
+                    # Parse out city, state, and zip code.
+                    # Foreign addresses won't parse so assign country, owner, address, and city variables. Set state and zip to blanks.
+                    if cityStateZip is None:
+                        country = str(row[37])
+                        owner = str(row[34])
+                        address = str(row[35])
+                        city = str(row[36])
+                        state = ''
+                        zipCode = ''
+                    else:
+                        country = ''
+                        row2 = str(row[2])
+
+                        # Sanitize rows that start with a space.
+                        if str(row[36]).startswith(' '):
+                            row2 = str(row[36])[1:]
+
+                        # Parse out city, state, and zip code and assign variables.
                         city = cityStateZip.group(1)
                         state = cityStateZip.group(2)
                         zipCode = cityStateZip.group(3)
-                        country = ''
-                    else:
-                        continue
-                    # Check to see if address starts with PO Box and assign variable.
-                    if str(row[37]).startswith('PO') or str(row[37]).startswith('P O'):
-                        address = str(row[37])
-                    elif "PO BOX" in str(row[37]) or "P O BOX" in str(row[37]) or "P.O. BOX" in str(row[37]):
-                        address = str(row[37])
 
-                    # Parse out address that doesn't have PO Box and assign variable.
-                    else:
-                        add = re.search(addressRegex,str(row[37]))
-                        address = add.group(1)
+                        # Check to see if address starts with PO Box and assign variable.
+                        if row2.startswith('PO') or row2.startswith('P O') or row2.startswith('P.O.'):
+                            address = row2
 
-                    # Assign owner variable.
-                    owner = str(row[34])+' '+str(row[35])+' '+str(row[36])
-                elif row[38].lower() in countriesList:
-                    country = str(row[38])
-                    state = str(row[37])
-                    city = str(row[36])
-                    address = str(row[35])
+                        # Sometimes there may be a word in front of PO Box and parse that out and assign variable.
+                        elif "PO BOX" in row2 or "P O BOX" in row2 or row2.startswith('ONE ') or row2.startswith('TWO '):
+                            address = row2
+                        else:
+                            # Parse out address that doesn't have PO Box and assign variable, sometimes there no address so set variable to None.
+                            add = re.search(addressRegex,row2)
+                            if add is None:
+                                address = 'None'
+                            else:
+                                address = add.group(1)
+
+                        # Assign owner variable.
+                        owner = str(row[34])+' '+str(row[35])
+
+                # Before moving to mail_addr2 must capture "blanks" and USA owned parcels and insert blanks.
+                elif row[0] == 'UNITED STATES OF AMERICA':
+                    cityStateZip = re.search(cityStateZipRegex, str(row[36]))
                     owner = str(row[34])
-                    zipCode = ''
-                elif row[38] == "CANADA": # temporary patch for incorrectly entered Canadian address
-                    canadaZip = re.search(r'[ABCEGHJKLMNPRSTVXY][0-9][ABCEGHJKLMNPRSTVWXYZ] ?[0-9][ABCEGHJKLMNPRSTVWXYZ][0-9]', str(row[3]))
-                    canadaProvZip = re.search(r'(.*?)\s(N[BLSTU]|[AMN]B|[BQ]C|ON|PE|SK)',str(row[36]))
-                    if canadaZip != None:
-                        zipCode = str(canadaZip.group(0))
+                    address = str(row[35])
+                    if cityStateZip is None:
+                        city = ''
+                        state = ''
+                        zipCode = ''
                     else:
-                        zipCode =''
-                        address = str(row[35])
-                        city = str(canadaProvZip.group(1))
-                        state = str(canadaProvZip.group(2))
-                        country = str(row[38])
-                else:
+                        city = cityStateZip.group(1)
+                        state = cityStateZip.group(2)
+                        zipCode = cityStateZip.group(3)
+                    country = ''
+                elif row[34] == ' ':
+                    owner = ''
+                    address = ''
+                    city = ''
+                    state = ''
+                    zipCode = ''
+                    country = ''
+                elif row[35] == ' ':
                     owner = str(row[34])
                     address = ''
                     city = ''
@@ -1189,915 +1137,851 @@ try:
                     zipCode = ''
                     country = ''
 
-            # If mail_addr4 is "empty".
-            elif row[37] != ' ':
-    #             print("Working on MAIL_ADDR3")
-                # Parse out city, state, and zip code.
-                cityStateZip = re.search(cityStateZipRegex, str(row[37]))
-
-                # Foreign addresses won't parse so assign country, owner, address, and city variables. Set state and zip to blanks.
-                if cityStateZip is None:
-                    country = str(row[37])
-                    owner = str(row[34])
-                    address = str(row[35])
-                    city = str(row[36])
-                    state = ''
-                    zipCode = ''
+                # Parse the rest of the address info.
                 else:
-                    country = ''
-                    row2 = str(row[2])
-
-                    # Sanitize rows that start with a space.
-                    if str(row[36]).startswith(' '):
-                        row2 = str(row[36])[1:]
-
-                    # Parse out city, state, and zip code and assign variables.
-                    city = cityStateZip.group(1)
-                    state = cityStateZip.group(2)
-                    zipCode = cityStateZip.group(3)
-
-                    # Check to see if address starts with PO Box and assign variable.
-                    if row2.startswith('PO') or row2.startswith('P O') or row2.startswith('P.O.'):
-                        address = row2
-
-                    # Sometimes there may be a word in front of PO Box and parse that out and assign variable.
-                    elif "PO BOX" in row2 or "P O BOX" in row2 or row2.startswith('ONE ') or row2.startswith('TWO '):
-                        address = row2
+        #             print("Working on MAIL_ADDR2")
+                    if str(row[36]) == ' ':
+                        owner = str(row[34])
+                        address = str(row[35])
+                        city = ''
+                        state = ''
+                        zipCode = ''
+                        country = ''
                     else:
-                        # Parse out address that doesn't have PO Box and assign variable, sometimes there no address so set variable to None.
-                        add = re.search(addressRegex,row2)
-                        if add is None:
-                            address = 'None'
+                        row2 = str(row[36])
+
+                        # Parse out city, state, and zip code and assign variables.
+                        cityStateZip = re.search(cityStateZipRegex, row2)
+
+                        # if it can't parse it's a foreign address and assign country variable.
+                        if cityStateZip is None:
+                            if "CANADA" in row2:
+                                cityStateZip = re.search(canadaRegex, row2)
+                                city = cityStateZip.group(1)
+                                state = cityStateZip.group(2)
+                                zipCode = cityStateZip.group(4)
+                                country = cityStateZip.group(3)
+                            if "BRAZIL" in row2:
+                                cityStateZip = re.search(brazilRegex, row2)
+                                city = cityStateZip.group(1)
+                                state = ''
+                                zipCode = cityStateZip.group(3)
+                                country = cityStateZip.group(2)
                         else:
-                            address = add.group(1)
-
-                    # Assign owner variable.
-                    owner = str(row[34])+' '+str(row[35])
-
-            # Before moving to mail_addr2 must capture "blanks" and USA owned parcels and insert blanks.
-            elif row[0] == 'UNITED STATES OF AMERICA':
-                cityStateZip = re.search(cityStateZipRegex, str(row[36]))
-                owner = str(row[34])
-                address = str(row[35])
-                if cityStateZip is None:
-                    city = ''
-                    state = ''
-                    zipCode = ''
-                else:
-                    city = cityStateZip.group(1)
-                    state = cityStateZip.group(2)
-                    zipCode = cityStateZip.group(3)
-                country = ''
-            elif row[34] == ' ':
-                owner = ''
-                address = ''
-                city = ''
-                state = ''
-                zipCode = ''
-                country = ''
-            elif row[35] == ' ':
-                owner = str(row[34])
-                address = ''
-                city = ''
-                state = ''
-                zipCode = ''
-                country = ''
-
-            # Parse the rest of the address info.
-            else:
-    #             print("Working on MAIL_ADDR2")
-                if str(row[36]) == ' ':
-                    owner = str(row[34])
-                    address = str(row[35])
-                    city = ''
-                    state = ''
-                    zipCode = ''
-                    country = ''
-                else:
-                    row2 = str(row[36])
-
-                    # Parse out city, state, and zip code and assign variables.
-                    cityStateZip = re.search(cityStateZipRegex, row2)
-
-                    # if it can't parse it's a foreign address and assign country variable.
-                    if cityStateZip is None:
-                        if "CANADA" in row2:
-                            cityStateZip = re.search(canadaRegex, row2)
+                            row1 = str(row[35])
+                            country = ''
                             city = cityStateZip.group(1)
                             state = cityStateZip.group(2)
-                            zipCode = cityStateZip.group(4)
-                            country = cityStateZip.group(3)
-                        if "BRAZIL" in row2:
-                            cityStateZip = re.search(brazilRegex, row2)
-                            city = cityStateZip.group(1)
-                            state = ''
                             zipCode = cityStateZip.group(3)
-                            country = cityStateZip.group(2)
-                    else:
-                        row1 = str(row[35])
-                        country = ''
-                        city = cityStateZip.group(1)
-                        state = cityStateZip.group(2)
-                        zipCode = cityStateZip.group(3)
 
-                        # Sanitize rows that start with a space.
-                        if row1.startswith(' '):
-                            row1 = row1[1:]
+                            # Sanitize rows that start with a space.
+                            if row1.startswith(' '):
+                                row1 = row1[1:]
 
-                        # Check to see if address starts with PO Box and assign variable.
-                        if row1.startswith('PO') or row1.startswith('P.O.') or row1.startswith('P O') or row1.startswith('P  O'):
-                            address = str(row[35])
+                            # Check to see if address starts with PO Box and assign variable.
+                            if row1.startswith('PO') or row1.startswith('P.O.') or row1.startswith('P O') or row1.startswith('P  O'):
+                                address = str(row[35])
 
-                        # Sometimes there may be a word in front of PO Box and parse that out and assign variable.
-                        elif "PO BOX" in row1 or "P O BOX" in row1:
-                            poBox = re.search(poBoxRegex,row1)
+                            # Sometimes there may be a word in front of PO Box and parse that out and assign variable.
+                            elif "PO BOX" in row1 or "P O BOX" in row1:
+                                poBox = re.search(poBoxRegex,row1)
 
-                            # If it can't be parsed assign variable.
-                            if poBox is None:
-                                address = row1
+                                # If it can't be parsed assign variable.
+                                if poBox is None:
+                                    address = row1
+                                else:
+                                    address = poBox.group(2)
                             else:
-                                address = poBox.group(2)
-                        else:
-                            # Parse out address that doesn't have PO Box and assign variable, sometimes there no address so set variable to None.
-                            add = re.search(addressRegex,row1)
+                                # Parse out address that doesn't have PO Box and assign variable, sometimes there no address so set variable to None.
+                                add = re.search(addressRegex,row1)
 
-                            # Have exception for addresses that spell out 'one' instead of '1'.
-                            if add is None or row1.startswith('ONE'):
-                                address = row1
-                            else:
-                                address = add.group(1)
+                                # Have exception for addresses that spell out 'one' instead of '1'.
+                                if add is None or row1.startswith('ONE'):
+                                    address = row1
+                                else:
+                                    address = add.group(1)
 
-                    # Set owner variable.
-                    owner = str(row[34])
+                        # Set owner variable.
+                        owner = str(row[34])
 
-            # Set Owner
-            row[12] = owner
-            
-            # Set Mailing Address
-            row[13] = address
-            
-            # Set Mailing City
-            row[14] = city
-            
-            # Set Mailing State
-            row[15] = state
-            
-            # Set Mailing ZIP
-            row[16] = zipCode[:5]
-    #         row[10] = country
+                # Set Owner
+                row[12] = owner
+                
+                # Set Mailing Address
+                row[13] = address
+                
+                # Set Mailing City
+                row[14] = city
+                
+                # Set Mailing State
+                row[15] = state
+                
+                # Set Mailing ZIP
+                row[16] = zipCode[:5]
+        #         row[10] = country
 
-            # Assessed Land Value
-            land_value = row[48]
-            if not(land_value is None):
-                row[17] = land_value
-            else:
-                row[17] = ''
-            
-            # Assessed Improved Value
-            improved_value = row[47]
-            if not (improved_value is None):
-                row[18] = improved_value
-            else:
-                row[18] = None
+                # Assessed Land Value
+                land_value = row[48]
+                if not(land_value is None):
+                    row[17] = land_value
+                else:
+                    row[17] = ''
+                
+                # Assessed Improved Value
+                improved_value = row[47]
+                if not (improved_value is None):
+                    row[18] = improved_value
+                else:
+                    row[18] = None
+                        
+                # Assessed Sum
+                if not (land_value is None or improved_value is None):
+                    assessed_sum = improved_value + land_value
+                    row[19] = assessed_sum
+                else:
+                    row[19] = None
+                
+                # Tax  Land Value
+                taxland_value = row[48]
+                if not(taxland_value is None):
+                    row[20] = taxland_value
+                else:
+                    row[20] = None
+                
+                # Tax Improved Value
+                taximproved_value = row[47]
+                if not (taximproved_value is None):
+                    row[21] = taximproved_value
+                else:
+                    row[21] = None
+                
+                # Tax Sum
+                if not (land_value is None or improved_value is None):
+                    tax_sum = taximproved_value + taxland_value
+                    row[22] = tax_sum
+                else:
+                    row[22] = None
+                
+                # Tax Year
+                row[23] = datetime.datetime.now().year # get current year
                     
-            # Assessed Sum
-            if not (land_value is None or improved_value is None):
-                assessed_sum = improved_value + land_value
-                row[19] = assessed_sum
-            else:
-                row[19] = None
-            
-            # Tax  Land Value
-            taxland_value = row[48]
-            if not(taxland_value is None):
-                row[20] = taxland_value
-            else:
-                row[20] = None
-            
-            # Tax Improved Value
-            taximproved_value = row[47]
-            if not (taximproved_value is None):
-                row[21] = taximproved_value
-            else:
-                row[21] = None
-            
-            # Tax Sum
-            if not (land_value is None or improved_value is None):
-                tax_sum = taximproved_value + taxland_value
-                row[22] = tax_sum
-            else:
-                row[22] = None
-            
-            # Tax Year
-            row[23] = datetime.datetime.now().year # get current year
+                # County Land Use Code
+                county_luc = row[45]
+                if not (county_luc is None):
+                    row[24] = str(county_luc)
+                else:
+                    row[24] = '' 
                 
-            # County Land Use Code
-            county_luc = row[45]
-            if not (county_luc is None):
-                row[24] = str(county_luc)
-            else:
-                row[24] = '' 
-            
-            # County Land Use - See Search/Update Cursor Below
-            county_landuse = row[46]
-            if not (county_landuse is None or county_landuse=='' or county_landuse.isspace()==True):
-                row[25] = county_landuse
-            else:
-                row[25] = '' 
-            
-            # Year Built
-            year_built = row[49]
-            if not (year_built is None):
-                row[26] = year_built
-            else:
-                row[26] = None
+                # County Land Use - See Search/Update Cursor Below
+                county_landuse = row[46]
+                if not (county_landuse is None or county_landuse=='' or county_landuse.isspace()==True):
+                    row[25] = county_landuse
+                else:
+                    row[25] = '' 
                 
-            # Units
-            units = row[50]
-            if not (units is None):
-                row[27] = units
-            else:
-                row[27] = None
-            
-            # Bedrooms
-            bedrooms = row[51]
-            if not (bedrooms is None):
-                row[28] = bedrooms
-            else:
-                row[28] = None
+                # Year Built
+                year_built = row[49]
+                if not (year_built is None):
+                    row[26] = year_built
+                else:
+                    row[26] = None
+                    
+                # Units
+                units = row[50]
+                if not (units is None):
+                    row[27] = units
+                else:
+                    row[27] = None
+                
+                # Bedrooms
+                bedrooms = row[51]
+                if not (bedrooms is None):
+                    row[28] = bedrooms
+                else:
+                    row[28] = None
 
-            # Update the row.
-            cursor.updateRow(row)
-    del cursor
+                # Update the row.
+                cursor.updateRow(row)
+        del cursor
 
-    out_coordinate_system = arcpy.SpatialReference('NAD 1983 UTM Zone 10N') 
-    CombineAPNs(eldoradoParcel, 'APN_TRPA')
-    arcpy.Project_management(eldoradoParcel, parcel_out, out_coordinate_system)
-    print('New El Dorado Parcels transformed')
-    logger.info("New El Dorado Parcels Transformed")
+        out_coordinate_system = arcpy.SpatialReference('NAD 1983 UTM Zone 10N') 
+        CombineAPNs(eldoradoParcel, 'APN_TRPA')
+        arcpy.Project_management(eldoradoParcel, parcel_out, out_coordinate_system)
+        print('New El Dorado Parcels transformed')
+        logger.info("New El Dorado Parcels Transformed")
     #---------------------------------------------------------------------------------
     # PLACER COUNTY TRANSFORM
     #---------------------------------------------------------------------------------
-    in_features = "Parcel_PL_Extracted"
-    parcel_out  = "Parcel_PL_Transformed"
+    county_to_check = 'Placer'
+    exists = is_county_in_list(county_to_check, counties_to_run)
+    print(f"Is {county_to_check} in the list? {exists}")
+    
+    if exists == 1:
+        in_features = "Parcel_PL_Extracted"
+        parcel_out  = "Parcel_PL_Transformed"
 
-    # in-memory feature class
-    placerParcel = r"in_memory/inMemoryFeatureClass"
+        # in-memory feature class
+        placerParcel = r"in_memory/inMemoryFeatureClass"
 
-    # copy feature class into in-memory feature class to work on
-    arcpy.management.CopyFeatures(in_features, placerParcel)
+        # copy feature class into in-memory feature class to work on
+        arcpy.management.CopyFeatures(in_features, placerParcel)
 
-    # Add TRPA base fields
-    arcpy.management.AddFields(placerParcel, baseFields)
+        # Add TRPA base fields
+        arcpy.management.AddFields(placerParcel, baseFields)
 
-    # Transform County data to TRPA data.
-    with arcpy.da.UpdateCursor(placerParcel, ['APN_TRPA',               #0
-                                            'PPNO_TRPA',                #1
-                                            'JURISDICTION_TRPA',        #2
-                                            # parcel address   
-                                            'HSE_NUMBR_TRPA',           #3
-                                            'STR_DIR_TRPA',             #4
-                                            'STR_NAME_TRPA',            #5
-                                            'STR_SUFFIX_TRPA',          #6
-                                            'UNIT_NUMBR_TRPA',          #7
-                                            'APO_ADDRESS_TRPA',         #8
-                                            'PSTL_TOWN_TRPA',           #9
-                                            'PSTL_STATE_TRPA',          #10
-                                            'PSTL_ZIP5_TRPA',           #11
-                                            # owner fields
-                                            'OWN_FIRST_TRPA',           #12
-                                            'OWN_LAST_TRPA',            #13
-                                            'OWN_FULL_TRPA',            #14
-                                            'MAIL_ADD1_TRPA',           #15
-                                            'MAIL_CITY_TRPA',           #16
-                                            'MAIL_STATE_TRPA',          #17
-                                            'MAIL_ZIP5_TRPA',           #18
-                                            # value fields  
-                                            'AS_LANDVALUE_TRPA',        #19
-                                            'AS_IMPROVALUE_TRPA',       #20
-                                            'AS_SUM_TRPA',              #21
-                                            'TAX_LANDVALUE_TRPA',       #22 
-                                            'TAX_IMPROVALUE_TRPA',      #23
-                                            'TAX_SUM_TRPA',             #24
-                                            'TAX_YEAR_TRPA',            #25
-                                            # land use fields 
-                                            'COUNTY_LANDUSE_CODE_TRPA', #26
-                                            'COUNTY_LANDUSE_TRPA',      #27
-                                            # Fields for building info
-                                            "YEAR_BUILT_TRPA",          #28
-                                            'UNITS_TRPA',               #29
-                                            'BEDROOMS_TRPA',            #30
-                                            'BATHROOMS_TRPA',           #31
-                                            'BUILDING_SQFT_TRPA',       #32
-                                            'VHR_TRPA',                 #33
-                                            'HOA_TRPA',                 #34
-                                            ###-------------------------###
-                                            # County Fields to get data from
-                                            'APN',   # apn                #35
-                                            'FEEPARCEL',   # ppno            #36
-                                            'STREETNUM', # house number   #37
-                                            'STREETDIR',# street dir      #38
-                                            'STREETNAME',# street name    #39
-                                            'STREETTYPE',# street suffix  #40
-                                            'SP_APT',  # unit number      #41
-                                            'OWNER1',# owner name         #42
-                                            'OWNER2',# owner 2            #43
-                                            'MailingAdr1',  # mailing addr1      #44
-                                            'MailingAdr2',  # mailing addr2      #45
-                                            'MailingCity',  # city               #46 
-                                            'MailingState', # state              #47
-                                            'MailingZip',  # zip                 #48
-                                            'USE_CD', # land use code     #49
-                                            'USE_CD_N', # land use desc   #50
-                                            'LANDVALUE',# land value      #51
-                                            'STRUCTURE',# improved value  #52
-                                            'EffectiveYr',# year built     #53
-                                            'StructureSF',  # build sqft      #54
-                                            'SitusZip'      # Parcel zip      #55
-                                        
-    ]) as cursor:   
-        # loop through each record to transform values to TRPA schema values
-        for row in cursor:
-            # set APN
-            apn = row[35]
-            if not (apn is None or apn == "" or apn.isspace() == True or "ROW" in apn or len(apn) < 8):
-                row[0] =apn[:11]
-            else:
-                row[0] = ""
+        # Transform County data to TRPA data.
+        with arcpy.da.UpdateCursor(placerParcel, ['APN_TRPA',               #0
+                                                'PPNO_TRPA',                #1
+                                                'JURISDICTION_TRPA',        #2
+                                                # parcel address   
+                                                'HSE_NUMBR_TRPA',           #3
+                                                'STR_DIR_TRPA',             #4
+                                                'STR_NAME_TRPA',            #5
+                                                'STR_SUFFIX_TRPA',          #6
+                                                'UNIT_NUMBR_TRPA',          #7
+                                                'APO_ADDRESS_TRPA',         #8
+                                                'PSTL_TOWN_TRPA',           #9
+                                                'PSTL_STATE_TRPA',          #10
+                                                'PSTL_ZIP5_TRPA',           #11
+                                                # owner fields
+                                                'OWN_FIRST_TRPA',           #12
+                                                'OWN_LAST_TRPA',            #13
+                                                'OWN_FULL_TRPA',            #14
+                                                'MAIL_ADD1_TRPA',           #15
+                                                'MAIL_CITY_TRPA',           #16
+                                                'MAIL_STATE_TRPA',          #17
+                                                'MAIL_ZIP5_TRPA',           #18
+                                                # value fields  
+                                                'AS_LANDVALUE_TRPA',        #19
+                                                'AS_IMPROVALUE_TRPA',       #20
+                                                'AS_SUM_TRPA',              #21
+                                                'TAX_LANDVALUE_TRPA',       #22 
+                                                'TAX_IMPROVALUE_TRPA',      #23
+                                                'TAX_SUM_TRPA',             #24
+                                                'TAX_YEAR_TRPA',            #25
+                                                # land use fields 
+                                                'COUNTY_LANDUSE_CODE_TRPA', #26
+                                                'COUNTY_LANDUSE_TRPA',      #27
+                                                # Fields for building info
+                                                "YEAR_BUILT_TRPA",          #28
+                                                'UNITS_TRPA',               #29
+                                                'BEDROOMS_TRPA',            #30
+                                                'BATHROOMS_TRPA',           #31
+                                                'BUILDING_SQFT_TRPA',       #32
+                                                'VHR_TRPA',                 #33
+                                                'HOA_TRPA',                 #34
+                                                ###-------------------------###
+                                                # County Fields to get data from
+                                                'APN',   # apn                #35
+                                                'FEEPARCEL',   # ppno            #36
+                                                'STREETNUM', # house number   #37
+                                                'STREETDIR',# street dir      #38
+                                                'STREETNAME',# street name    #39
+                                                'STREETTYPE',# street suffix  #40
+                                                'SP_APT',  # unit number      #41
+                                                'OWNER1',# owner name         #42
+                                                'OWNER2',# owner 2            #43
+                                                'MailingAdr1',  # mailing addr1      #44
+                                                'MailingAdr2',  # mailing addr2      #45
+                                                'MailingCity',  # city               #46 
+                                                'MailingState', # state              #47
+                                                'MailingZip',  # zip                 #48
+                                                'USE_CD', # land use code     #49
+                                                'USE_CD_N', # land use desc   #50
+                                                'LANDVALUE',# land value      #51
+                                                'STRUCTURE',# improved value  #52
+                                                'EffectiveYr',# year built     #53
+                                                'StructureSF',  # build sqft      #54
+                                                'SitusZip'      # Parcel zip      #55
+                                            
+        ]) as cursor:   
+            # loop through each record to transform values to TRPA schema values
+            for row in cursor:
+                # set APN
+                apn = row[35]
+                if not (apn is None or apn == "" or apn.isspace() == True or "ROW" in apn or len(apn) < 8):
+                    row[0] =apn[:11]
+                else:
+                    row[0] = ""
+                    
+                # set PPNO
+                # Changed it to 9 rather than 8
+                ppno = row[36]
+                if not (ppno is None or ppno == "" or "ROW" in ppno or len(ppno) < 8):
+                    row[1] = ppno[:9]
+                else:
+                    row[1] = 0
+                    
+                # Jurisdiction
+                row[2] = "PL"
                 
-            # set PPNO
-            # Changed it to 9 rather than 8
-            ppno = row[36]
-            if not (ppno is None or ppno == "" or "ROW" in ppno or len(ppno) < 8):
-                row[1] = ppno[:9]
-            else:
-                row[1] = 0
+                # House Number
+                house = row[37]
+                if not (house is None or house=='' or house.isspace()==True):
+                    row[3] = house
+                else:
+                    row[3] = ''
                 
-            # Jurisdiction
-            row[2] = "PL"
-            
-            # House Number
-            house = row[37]
-            if not (house is None or house=='' or house.isspace()==True):
-                row[3] = house
-            else:
-                row[3] = ''
-            
-            # Street Direction
-            street_direction = row[38]
-            if not (street_direction is None or street_direction=='' or street_direction.isspace()==True):
-                row[4] = street_direction
-            else:
-                row[4] = ''
+                # Street Direction
+                street_direction = row[38]
+                if not (street_direction is None or street_direction=='' or street_direction.isspace()==True):
+                    row[4] = street_direction
+                else:
+                    row[4] = ''
+                    
+                # Street Name
+                street_name = row[39]
+                if not (street_name is None or street_name =='' or street_name.isspace()==True):
+                    row[5] = street_name
+                else:
+                    row[5] = ''
+                    
+                # Street Suffix
+                street_suffix = row[40]
+                if not (street_suffix is None or street_suffix =='' or street_suffix.isspace()==True):
+                    row[6] = street_suffix
+                else:
+                    row[6] = ''
+                    
+                # Unit Number
+                unit= row[41]
+                if not (unit is None or unit=='' or unit.isspace()==True):
+                    row[7] = str(unit)
+                else:
+                    row[7] = ''
                 
-            # Street Name
-            street_name = row[39]
-            if not (street_name is None or street_name =='' or street_name.isspace()==True):
-                row[5] = street_name
-            else:
-                row[5] = ''
-                
-            # Street Suffix
-            street_suffix = row[40]
-            if not (street_suffix is None or street_suffix =='' or street_suffix.isspace()==True):
-                row[6] = street_suffix
-            else:
-                row[6] = ''
-                
-            # Unit Number
-            unit= row[41]
-            if not (unit is None or unit=='' or unit.isspace()==True):
-                row[7] = str(unit)
-            else:
-                row[7] = ''
-            
-            # APO Address
-            full_address = [house, street_direction, street_name, street_suffix, unit]
-            adr = str(' '.join(filter(None, full_address))).strip()
-            adr = re.sub(r"\s+", " ", adr).strip()
+                # APO Address
+                full_address = [house, street_direction, street_name, street_suffix, unit]
+                adr = str(' '.join(filter(None, full_address))).strip()
+                adr = re.sub(r"\s+", " ", adr).strip()
 
-            if not (adr is None or adr=='' or adr.isspace()==True):
-                row[8] = adr
-            else:
-                row[8] = ''
+                if not (adr is None or adr=='' or adr.isspace()==True):
+                    row[8] = adr
+                else:
+                    row[8] = ''
+                    
+                # Postal Town - See TRPA ATTRIBUTION section
+                    
+                # Postal State
+                row[10] = 'CA'
                 
-            # Postal Town - See TRPA ATTRIBUTION section
+                # Owner Name
+                owner1 = row[42]
+                owner2 = row[43]
+                # own first
+                if not (owner1 is None or owner1 == "" or owner1.isspace() == True):
+                    row[12] = owner1.strip()
+                else:
+                    row[12] = ''
+                # own last
+                if not (owner2 is None or owner2 == "" or owner2.isspace() == True):
+                    row[13] = owner2.strip()
+                else:
+                    row[13] = ''    
+                # own full
+                if not (owner2 is None or owner2 == "" or owner2.isspace() == True):
+                    row[14] = (owner1+" " + owner2).strip()
+                elif not (owner1 is None or owner1 == ""):
+                    row[14] = owner1.strip()
+                else:
+                    row[14] = ''
+                    
+                # Mailing Address
+                address1 = row[44]
+                address2 = row[45]
+                if not (address1 is None or address1=='' or address1.isspace()==True):
+                    row[15] = str(address1).strip()
+                else:
+                    row[15] = ''
                 
-            # Postal State
-            row[10] = 'CA'
+                # Mailing City
+                mail_city = row[46]
+                
+                if not (mail_city is None or mail_city=='' or mail_city.isspace()==True):
+                    row[16] = mail_city
+                else:
+                    row[16] = ''
+                    
+                # Mailing State
+                mail_state = row[47]
+                if not (mail_state is None or mail_state=='' or mail_state.isspace()==True):
+                    #row[17] = mail_state
+                    row[17] = mail_state[:2]
+                else:
+                    row[17] = ''
+                
+                # Mailing Zipcode
+                mail_zip = row[48]
+                if not (mail_zip is None or mail_zip=='' or mail_zip.isspace()==True):
+                    row[18] = mail_zip[:5]
+                else:
+                    row[18] = ''
+                    
+                # Assessed Land Value
+                land_value = row[51]
+                if not(land_value is None or land_value==''):
+                    row[19] = int(land_value)
+                else:
+                    row[19] = None
             
-            # Owner Name
-            owner1 = row[42]
-            owner2 = row[43]
-            # own first
-            if not (owner1 is None or owner1 == "" or owner1.isspace() == True):
-                row[12] = owner1.strip()
-            else:
-                row[12] = ''
-            # own last
-            if not (owner2 is None or owner2 == "" or owner2.isspace() == True):
-                row[13] = owner2.strip()
-            else:
-                row[13] = ''    
-            # own full
-            if not (owner2 is None or owner2 == "" or owner2.isspace() == True):
-                row[14] = (owner1+" " + owner2).strip()
-            elif not (owner1 is None or owner1 == ""):
-                row[14] = owner1.strip()
-            else:
-                row[14] = ''
-                
-            # Mailing Address
-            address1 = row[44]
-            address2 = row[45]
-            if not (address1 is None or address1=='' or address1.isspace()==True):
-                row[15] = str(address1).strip()
-            else:
-                row[15] = ''
-            
-            # Mailing City
-            mail_city = row[46]
-            
-            if not (mail_city is None or mail_city=='' or mail_city.isspace()==True):
-                row[16] = mail_city
-            else:
-                row[16] = ''
-                
-            # Mailing State
-            mail_state = row[47]
-            if not (mail_state is None or mail_state=='' or mail_state.isspace()==True):
-                #row[17] = mail_state
-                row[17] = mail_state[:2]
-            else:
-                row[17] = ''
-            
-            # Mailing Zipcode
-            mail_zip = row[48]
-            if not (mail_zip is None or mail_zip=='' or mail_zip.isspace()==True):
-                row[18] = mail_zip[:5]
-            else:
-                row[18] = ''
-                
-            # Assessed Land Value
-            land_value = row[51]
-            if not(land_value is None or land_value==''):
-                row[19] = int(land_value)
-            else:
-                row[19] = None
-        
-            # Assessed Improved Value    
-            improved_value = row[52]
-            if not (improved_value is None or improved_value==''):
-                row[20] = int(improved_value)
-            else:
-                row[20] = None
+                # Assessed Improved Value    
+                improved_value = row[52]
+                if not (improved_value is None or improved_value==''):
+                    row[20] = int(improved_value)
+                else:
+                    row[20] = None
 
-            # Assessed Sum
-            if not (row[19] is None and row[20] is None):
-                assessed_sum = improved_value + land_value
-                row[21] = assessed_sum
-            else:
-                row[21] = None
-            
-            # Tax Land Value
-            taxland_value = row[51]
-            if not(taxland_value is None):
-                row[22] = int(taxland_value)
-            else:
-                row[22] = None
-            
-            # Tax Improved Value
-            taximproved_value = row[52]
-            if not (taximproved_value is None):
-                row[23] = int(taximproved_value)
-            else:
-                row[23] = None
-            
-            # Tax Sum
-            if not (row[22] is None and row[23] is None):
-                tax_sum = taximproved_value + taxland_value
-                row[24] = tax_sum
-            else:
-                row[24] = None
-            
-            # Tax Year
-            row[25] = datetime.datetime.now().year # get current year
+                # Assessed Sum
+                if not (row[19] is None and row[20] is None):
+                    assessed_sum = improved_value + land_value
+                    row[21] = assessed_sum
+                else:
+                    row[21] = None
                 
-            # County Land Use Code
-            county_luc = row[49]
-            if not (county_luc is None or county_luc=='' or county_luc.isspace()==True):
-                row[26] = county_luc
-            else:
-                row[26] = '' 
-            
-            # County Land Use
-            county_landuse = row[50]
-            if not (county_landuse is None or county_landuse=='' or county_landuse.isspace()==True):
-                row[27] = county_landuse
-            else:
-                row[27] = ''
+                # Tax Land Value
+                taxland_value = row[51]
+                if not(taxland_value is None):
+                    row[22] = int(taxland_value)
+                else:
+                    row[22] = None
                 
-            # Year Built
-            year_built = row[53]
-            if not (year_built is None):
-                row[28] = year_built
-            else:
-                row[28] = None
+                # Tax Improved Value
+                taximproved_value = row[52]
+                if not (taximproved_value is None):
+                    row[23] = int(taximproved_value)
+                else:
+                    row[23] = None
                 
-            # Building SQFT
-            bldsqft = row[54]
-            if not (bldsqft is None):
-                row[32] = bldsqft
-            else:
-                row[32] = None
-
-            # Postal Zip
-            parcelzip = row[55]
-            if not (parcelzip is None):
-                row[11] = parcelzip
-            else:
-                row[11] = None
+                # Tax Sum
+                if not (row[22] is None and row[23] is None):
+                    tax_sum = taximproved_value + taxland_value
+                    row[24] = tax_sum
+                else:
+                    row[24] = None
                 
-            # Update the row.
-            cursor.updateRow(row)
-    del cursor
+                # Tax Year
+                row[25] = datetime.datetime.now().year # get current year
+                    
+                # County Land Use Code
+                county_luc = row[49]
+                if not (county_luc is None or county_luc=='' or county_luc.isspace()==True):
+                    row[26] = county_luc
+                else:
+                    row[26] = '' 
+                
+                # County Land Use
+                county_landuse = row[50]
+                if not (county_landuse is None or county_landuse=='' or county_landuse.isspace()==True):
+                    row[27] = county_landuse
+                else:
+                    row[27] = ''
+                    
+                # Year Built
+                year_built = row[53]
+                if not (year_built is None):
+                    row[28] = year_built
+                else:
+                    row[28] = None
+                    
+                # Building SQFT
+                bldsqft = row[54]
+                if not (bldsqft is None):
+                    row[32] = bldsqft
+                else:
+                    row[32] = None
 
-    # combine duplicate APNs 
-    ### some shoreline parcels are split by the highway and have two features for the same APN
-    CombineAPNs(placerParcel, 'APN_TRPA')
+                # Postal Zip
+                parcelzip = row[55]
+                if not (parcelzip is None):
+                    row[11] = parcelzip
+                else:
+                    row[11] = None
+                    
+                # Update the row.
+                cursor.updateRow(row)
+        del cursor
 
-    # project to our projected coordinate system
-    out_coordinate_system = arcpy.SpatialReference('NAD 1983 UTM Zone 10N') 
-    arcpy.Project_management(placerParcel, parcel_out, out_coordinate_system)
+        # combine duplicate APNs 
+        ### some shoreline parcels are split by the highway and have two features for the same APN
+        CombineAPNs(placerParcel, 'APN_TRPA')
 
-    # done with the transormations for Placer
-    print('New Placer Parcels transformed')
-    logger.info('New Placer Parcels Transformed')
+        # project to our projected coordinate system
+        out_coordinate_system = arcpy.SpatialReference('NAD 1983 UTM Zone 10N') 
+        arcpy.Project_management(placerParcel, parcel_out, out_coordinate_system)
+
+        # done with the transormations for Placer
+        print('New Placer Parcels transformed')
+        logger.info('New Placer Parcels Transformed')
     #-------------------------------------------------------------------------------------------
     # WASHOE COUNTY TRANSFORM
     #-------------------------------------------------------------------------------------------
-    # input/output
-    in_features = "Parcel_WA_Extracted"
-    parcel_out  = "Parcel_WA_Transformed"
+    county_to_check = 'Washoe'
+    exists = is_county_in_list(county_to_check, counties_to_run)
+    print(f"Is {county_to_check} in the list? {exists}")
+    
+    if exists == 1:
+        # input/output
+        in_features = "Parcel_WA_Extracted"
+        parcel_out  = "Parcel_WA_Transformed"
 
-    # in-memory feature class
-    washoeParcels = r"in_memory/inMemoryFeatureClass"
+        # in-memory feature class
+        washoeParcels = r"in_memory/inMemoryFeatureClass"
 
-    # copy features to in-memory feature class
-    arcpy.CopyFeatures_management(in_features, washoeParcels)
+        # copy features to in-memory feature class
+        arcpy.CopyFeatures_management(in_features, washoeParcels)
 
-    # Add TRPA base fields
-    arcpy.management.AddFields(washoeParcels,baseFields)
+        # Add TRPA base fields
+        arcpy.management.AddFields(washoeParcels,baseFields)
 
-    # Tansform County Data to TRPA Data.
-    with arcpy.da.UpdateCursor(washoeParcels, ['APN_TRPA',              #row[0]
-                                            'PPNO_TRPA',                #row[1]
-                                            'JURISDICTION_TRPA',        #row[2]
-                                            # parcel address   
-                                            'HSE_NUMBR_TRPA',           #3
-                                            'STR_DIR_TRPA',             #4
-                                            'STR_NAME_TRPA',            #5
-                                            'STR_SUFFIX_TRPA',          #6
-                                            'UNIT_NUMBR_TRPA',          #7
-                                            'APO_ADDRESS_TRPA',         #8
-                                            'PSTL_TOWN_TRPA',           #9
-                                            'PSTL_STATE_TRPA',          #10
-                                            'PSTL_ZIP5_TRPA',           #11
-                                            # owner fields
-                                            'OWN_FIRST_TRPA',           #12
-                                            'OWN_LAST_TRPA',            #13
-                                            'OWN_FULL_TRPA',            #14
-                                            'MAIL_ADD1_TRPA',           #15
-                                            'MAIL_CITY_TRPA',           #16
-                                            'MAIL_STATE_TRPA',          #17
-                                            'MAIL_ZIP5_TRPA',           #18
-                                            # value fields  
-                                            'AS_LANDVALUE_TRPA',        #19
-                                            'AS_IMPROVALUE_TRPA',       #20
-                                            'AS_SUM_TRPA',              #21
-                                            'TAX_LANDVALUE_TRPA',       #22 
-                                            'TAX_IMPROVALUE_TRPA',      #23
-                                            'TAX_SUM_TRPA',             #24
-                                            'TAX_YEAR_TRPA',            #25
-                                            # land use fields 
-                                            'COUNTY_LANDUSE_CODE_TRPA', #26
-                                            'COUNTY_LANDUSE_TRPA',      #27
-                                            # Fields for building info
-                                            "YEAR_BUILT_TRPA",          #28
-                                            'UNITS_TRPA',               #29
-                                            'BEDROOMS_TRPA',            #30
-                                            'BATHROOMS_TRPA',           #31
-                                            'BUILDING_SQFT_TRPA',       #32
-                                            'VHR_TRPA',                 #33
-                                            'HOA_TRPA',                 #34
-                                            ###-------------------------###
-                                            # County Fields to get data from
-                                            'PIN',   # apn              #35
-                                            'APN',   # ppno             #36
-                                            'FullAddress',#full adrress #37
-                                            'STREETNUM', # house number #38
-                                            'STREETDIR',# street dir    #39
-                                            'STREET',# street name      #40
-                                            'CITY',    # postal town    #41
-                                            'SITUSZIP', # postal zip    #42
-                                            'SQFEET',# building sqft    #43
-                                            'FIRSTNAME',# first name    #44
-                                            'LASTNAME', # last name     #45
-                                            'MAILING1',# mailing addr1  #46
-                                            'MAILING2',# mailing addr2  #47
-                                            'MAILCITY',# city           #48
-                                            'MAILSTATE', # mailing state#49
-                                            'MAILZIP',  # zip           #50
-                                            'TAXYEAR', # tax year       #51
-                                            'LAND_USE',# land use code  #52
-                                            'LANDASS',# land value      #53
-                                            'BUILDASS',# improved value #54
-                                            'TOTALASS', # total assesed #55
-                                            'LANDAPR',  # land apr      #56
-                                            'BUILDAPR', # building apr  #57
-                                            'TOTALAPR', # total apr     #58
-                                            'YEARBLT',# year built      #59
-                                            'STORIES',# stories         #60
-                                            'BEDROOMS', # bedrooms      #61      
-                                            'BATHS',# bathrooms         #62
-                                            'UNITS'   # units           #63
-    ]) as cursor:
-        # loop through each record and transform the values
-        for row in cursor:
-            # APN field
-            # Get County value
-            apn  = row[35]
-            if not (apn is None or apn == "" or apn.isspace() == True):
-                # set TRPA value
-                row[0] = apn
-            else:
-                row[0] = ''
-                
-            #PPNO
-            ppno = row[36]
-            if not (ppno is None or ppno == ""):
-                row[1] = int(ppno)
-            else:
-                row[1] = None
-                
-            # Jurisdiction
-            row[2] = "WA"
+        # Tansform County Data to TRPA Data.
+        with arcpy.da.UpdateCursor(washoeParcels, ['APN_TRPA',              #row[0]
+                                                'PPNO_TRPA',                #row[1]
+                                                'JURISDICTION_TRPA',        #row[2]
+                                                # parcel address   
+                                                'HSE_NUMBR_TRPA',           #3
+                                                'STR_DIR_TRPA',             #4
+                                                'STR_NAME_TRPA',            #5
+                                                'STR_SUFFIX_TRPA',          #6
+                                                'UNIT_NUMBR_TRPA',          #7
+                                                'APO_ADDRESS_TRPA',         #8
+                                                'PSTL_TOWN_TRPA',           #9
+                                                'PSTL_STATE_TRPA',          #10
+                                                'PSTL_ZIP5_TRPA',           #11
+                                                # owner fields
+                                                'OWN_FIRST_TRPA',           #12
+                                                'OWN_LAST_TRPA',            #13
+                                                'OWN_FULL_TRPA',            #14
+                                                'MAIL_ADD1_TRPA',           #15
+                                                'MAIL_CITY_TRPA',           #16
+                                                'MAIL_STATE_TRPA',          #17
+                                                'MAIL_ZIP5_TRPA',           #18
+                                                # value fields  
+                                                'AS_LANDVALUE_TRPA',        #19
+                                                'AS_IMPROVALUE_TRPA',       #20
+                                                'AS_SUM_TRPA',              #21
+                                                'TAX_LANDVALUE_TRPA',       #22 
+                                                'TAX_IMPROVALUE_TRPA',      #23
+                                                'TAX_SUM_TRPA',             #24
+                                                'TAX_YEAR_TRPA',            #25
+                                                # land use fields 
+                                                'COUNTY_LANDUSE_CODE_TRPA', #26
+                                                'COUNTY_LANDUSE_TRPA',      #27
+                                                # Fields for building info
+                                                "YEAR_BUILT_TRPA",          #28
+                                                'UNITS_TRPA',               #29
+                                                'BEDROOMS_TRPA',            #30
+                                                'BATHROOMS_TRPA',           #31
+                                                'BUILDING_SQFT_TRPA',       #32
+                                                'VHR_TRPA',                 #33
+                                                'HOA_TRPA',                 #34
+                                                ###-------------------------###
+                                                # County Fields to get data from
+                                                'PIN',   # apn              #35
+                                                'APN',   # ppno             #36
+                                                'FullAddress',#full adrress #37
+                                                'STREETNUM', # house number #38
+                                                'STREETDIR',# street dir    #39
+                                                'STREET',# street name      #40
+                                                'CITY',    # postal town    #41
+                                                'SITUSZIP', # postal zip    #42
+                                                'SQFEET',# building sqft    #43
+                                                'FIRSTNAME',# first name    #44
+                                                'LASTNAME', # last name     #45
+                                                'MAILING1',# mailing addr1  #46
+                                                'MAILING2',# mailing addr2  #47
+                                                'MAILCITY',# city           #48
+                                                'MAILSTATE', # mailing state#49
+                                                'MAILZIP',  # zip           #50
+                                                'TAXYEAR', # tax year       #51
+                                                'LAND_USE',# land use code  #52
+                                                'LANDASS',# land value      #53
+                                                'BUILDASS',# improved value #54
+                                                'TOTALASS', # total assesed #55
+                                                'LANDAPR',  # land apr      #56
+                                                'BUILDAPR', # building apr  #57
+                                                'TOTALAPR', # total apr     #58
+                                                'YEARBLT',# year built      #59
+                                                'STORIES',# stories         #60
+                                                'BEDROOMS', # bedrooms      #61      
+                                                'BATHS',# bathrooms         #62
+                                                'UNITS'   # units           #63
+        ]) as cursor:
+            # loop through each record and transform the values
+            for row in cursor:
+                # APN field
+                # Get County value
+                apn  = row[35]
+                if not (apn is None or apn == "" or apn.isspace() == True):
+                    # set TRPA value
+                    row[0] = apn
+                else:
+                    row[0] = ''
                     
-            # APO Address
-            fulladdress = row[37]
-            if not (fulladdress is None or fulladdress=='' or fulladdress.isspace()==True):
-                row[8] = fulladdress
-            else:
-                row[8] = ''
-            
-            # House Number
-            house = row[38]
-            if not (house is None or house=='' or house.isspace()==True):
-                row[3] = house
-            else:
-                row[3] = ''
+                #PPNO
+                ppno = row[36]
+                if not (ppno is None or ppno == ""):
+                    row[1] = int(ppno)
+                else:
+                    row[1] = None
+                    
+                # Jurisdiction
+                row[2] = "WA"
+                        
+                # APO Address
+                fulladdress = row[37]
+                if not (fulladdress is None or fulladdress=='' or fulladdress.isspace()==True):
+                    row[8] = fulladdress
+                else:
+                    row[8] = ''
                 
-            
-            # Unit Number
-            if not (fulladdress is None or fulladdress == ""):
-                if fulladdress.strip()[-1].isdigit():
-                    if not ('STATE ROUTE 28' in fulladdress):
-                        row[7] = (fulladdress.rsplit(' ')[-1].strip())
-                    else:
-                        if not (fulladdress.strip().rsplit(' ')[-1] == '28'):
+                # House Number
+                house = row[38]
+                if not (house is None or house=='' or house.isspace()==True):
+                    row[3] = house
+                else:
+                    row[3] = ''
+                    
+                
+                # Unit Number
+                if not (fulladdress is None or fulladdress == ""):
+                    if fulladdress.strip()[-1].isdigit():
+                        if not ('STATE ROUTE 28' in fulladdress):
                             row[7] = (fulladdress.rsplit(' ')[-1].strip())
                         else:
-                            if not ('STATE ROUTE 28 28' in fulladdress): 
-                                row[7] = ""
+                            if not (fulladdress.strip().rsplit(' ')[-1] == '28'):
+                                row[7] = (fulladdress.rsplit(' ')[-1].strip())
                             else:
+                                if not ('STATE ROUTE 28 28' in fulladdress): 
+                                    row[7] = ""
+                                else:
+                                    row[7] = (fulladdress.rsplit(' ')[-1].strip())
+                    else:
+                        if not ('US HIGHWAY 395' in fulladdress):
+                            if len(fulladdress.rsplit(' ')[-1]) == 1:
                                 row[7] = (fulladdress.rsplit(' ')[-1].strip())
-                else:
-                    if not ('US HIGHWAY 395' in fulladdress):
-                        if len(fulladdress.rsplit(' ')[-1]) == 1:
-                            row[7] = (fulladdress.rsplit(' ')[-1].strip())
-                        elif not (len(fulladdress.rsplit(' ')[-1]) == 1):
-                            if fulladdress[-2].isdigit():
-                                row[7] = (fulladdress.rsplit(' ')[-1].strip())
+                            elif not (len(fulladdress.rsplit(' ')[-1]) == 1):
+                                if fulladdress[-2].isdigit():
+                                    row[7] = (fulladdress.rsplit(' ')[-1].strip())
+                                else:
+                                    row[7] = ""
                             else:
                                 row[7] = ""
                         else:
                             row[7] = ""
-                    else:
-                        row[7] = ""
-            else:
-                row[7] = ""
-                
-            # Street Direction
-            stdir = row[39]
-            if not (stdir is None):
-                row[4] = (stdir.strip())
-            else:
-                row[4] = ""
-                
-            # Street Name    
-            stname = row[40]
-            if not (stname is None or stname in ('CROSS BOW', 'ENTERPRISE', 'STATE ROUTE 28', 'UNSPECIFIED', 'US HIGHWAY 395', '')):
-                if stname[:2] in ('N ', 'S ', 'E ', 'W '):
-                    row[5] = stname.rsplit(' ',1)[0].strip().split(' ',1)[1].strip()
-                elif not (stname is None or stname == "" or stname.isspace() == True):
-                    row[5] = (stname.rsplit(' ',1)[0].strip())
-                #Currently the only example of this is two blanks in Incline Village with no info
-                elif stname is None or stname == "" or stname.isspace() == True:
-                    if fulladdress[0].isdigit():
-                        row[5] = (fulladdress.rsplit(' ')[-1].strip())
-                    else:
-                        row[5] = ""
                 else:
-                    logging.info("Error parsing washoe street name")
-            elif stname in ('CROSS BOW', 'ENTERPRISE', 'STATE ROUTE 28', 'UNSPECIFIED', ''):
-                    row[5] = (stname.strip())
-            else:
-                row[5] = ""
-                
-            # Street Suffix
-            if not stname in ('CROSS BOW', 'ENTERPRISE', 'STATE ROUTE 28', 'UNSPECIFIED', 'US HIGHWAY 395', ''):
-                if not (stname is None or stname == "" or stname.isspace() == True):
-                    row[6] = (stname.rsplit(' ')[-1].strip())
-                elif stname is None or stname == "" or stname.isspace() == True:
-                    if not (fulladdress is None or fulladdress[0].isdigit()):
-                        row[6] = (fulladdress.rsplit(' ')[-1].strip())
-                    else:
-                        row[6] = ""
-                else:
-                    logging.info("Error parsing washoe street suffix")
-            else:
-                row[11] = ""
-
-            # Postal Town
-            postal_town = row[41]
-            if not (postal_town is None or postal_town == '' or postal_town.isspace()==True):
-                row[9] = postal_town
-            else:
-                row[9] = ''
-                
-            # Postal State
-            row[10] = 'NV'
-            
-            # Postal Zip
-            postal_zip = row[42]
-            if not (postal_zip is None or postal_zip == '' or postal_zip.isspace()==True):
-                row[11] = postal_zip
-            else:
-                row[11] = ''
-                
-            # Owner Name
-            # set owner first name
-            ownfirst = row[44]
-            if not (ownfirst is None or ownfirst.isspace() == True):
-                row[12] = ownfirst
-            else:
-                row[12] = ""
-            
-            # own last
-            ownlast = row[45]
-            if not (ownlast is None or ownlast.isspace() == True):
-                row[13] = ownlast
-            else:
-                row[13] = ""
-            
-            # own full
-            if not (ownfirst is None and ownlast is None):
-                row[14] = (ownfirst + " " + ownlast).strip()
-            else:
-                row[14] = ""
-                
-            # Mailing Address
-            if not (row[46] is None):  
-                address1 = row[46].strip()
-            if not (row[47] is None):
-                address2 = row[47].strip()
-            if not (address1 is None or address1=='' or address1.isspace()==True):
-                row[15] = str((address1 + " " + address2).strip())
-            elif (address2 is None):
-                row[15] = address1
-            else:
-                row[15] = ''
-            
-            # Mailing City
-            mail_city = row[48]
-            if not (mail_city is None or mail_city=='' or mail_city.isspace()==True):
-                row[16] = mail_city
-            else:
-                row[16] = ''
-                
-            # Mailing State
-            mail_state = row[49]
-            if not (mail_state is None or mail_state=='' or mail_state.isspace()==True):
-                #row[17] = mail_state
-                row[17] = mail_state[:2]
-            else:
-                row[17] = ''
-            
-            # Mailing Zipcode
-            if not (row[50] is None):
-                mail_zip = row[50].strip()
-            if not (mail_zip is None or mail_zip=='' or mail_zip.isspace()==True):
-                row[18] = mail_zip[:5]
-            else:
-                row[18] = ''
-                
-            # Assessement Value
-            land_value = row[53]
-            if not(land_value is None or land_value==''):
-                row[19] = land_value
-            else:
-                row[19] = None
-            
-            improved_value = row[54]
-            if not (improved_value is None or improved_value==''):
-                row[20] = improved_value
-            else:
-                row[20] = None
+                    row[7] = ""
                     
-            assessed_sum = row[55]
-            if not (assessed_sum is None or assessed_sum==''):
-                row[21] = assessed_sum
-            else:
-                row[21] = None
-            
-            # Tax Value
-            taxland_value = row[56]
-            if not(taxland_value is None or taxland_value==''):
-                row[22] = taxland_value
-            else:
-                row[22] = None
-            
-            taximproved_value = row[57]
-            if not (taximproved_value is None or taximproved_value==''):
-                row[23] = taximproved_value
-            else:
-                row[23] = None
-            
-            tax_sum = row[58]
-            if not (tax_sum is None or tax_sum==''):
-                row[24] = tax_sum
-            else:
-                row[24] = None
-            
-            # Tax Year
-            tax_year = row[51]
-            if not (tax_year is None or tax_year=='' or tax_year.isspace()==True):
-                row[25] = tax_year
-            else:
-                row[25] = None
-                
-            # County Land Use Code
-            county_luc = row[52]
-            if not (county_luc is None or county_luc=='' or county_luc.isspace()==True):
-                row[26] = int(county_luc.split(",",1)[0].strip())
-            else:
-                row[26] = None 
-            
-            # Year Built
-            year_built = row[59]
-            if not (year_built is None or year_built==''):
-                row[28] = year_built
-            else:
-                row[28] = None
-                
-            # Units
-            units = row[63]
-            if not (units is None or units==''):
-                row[29] = int(units)
-            else:
-                row[29] = None
-            
-            # Bedrooms
-            bedrooms = row[61]
-            if not (bedrooms is None or bedrooms==''):
-                row[30] = bedrooms
-            else:
-                row[30] = None
-            
-            # Bathrooms
-            bathrooms = row[62]
-            if not (bathrooms is None or bathrooms==''):
-                row[31] = bathrooms
-            else:
-                row[31] = None
-                
-            # Building Square Feet
-            building_sqft = row[43]
-            if not (building_sqft is None or building_sqft==''):
-                row[32] = building_sqft
-            else:
-                row[32] = None
+                # Street Direction
+                stdir = row[39]
+                if not (stdir is None):
+                    row[4] = (stdir.strip())
+                else:
+                    row[4] = ""
+                    
+                # Street Name    
+                stname = row[40]
+                if not (stname is None or stname in ('CROSS BOW', 'ENTERPRISE', 'STATE ROUTE 28', 'UNSPECIFIED', 'US HIGHWAY 395', '')):
+                    if stname[:2] in ('N ', 'S ', 'E ', 'W '):
+                        row[5] = stname.rsplit(' ',1)[0].strip().split(' ',1)[1].strip()
+                    elif not (stname is None or stname == "" or stname.isspace() == True):
+                        row[5] = (stname.rsplit(' ',1)[0].strip())
+                    #Currently the only example of this is two blanks in Incline Village with no info
+                    elif stname is None or stname == "" or stname.isspace() == True:
+                        if fulladdress[0].isdigit():
+                            row[5] = (fulladdress.rsplit(' ')[-1].strip())
+                        else:
+                            row[5] = ""
+                    else:
+                        logging.info("Error parsing washoe street name")
+                elif stname in ('CROSS BOW', 'ENTERPRISE', 'STATE ROUTE 28', 'UNSPECIFIED', ''):
+                        row[5] = (stname.strip())
+                else:
+                    row[5] = ""
+                    
+                # Street Suffix
+                if not stname in ('CROSS BOW', 'ENTERPRISE', 'STATE ROUTE 28', 'UNSPECIFIED', 'US HIGHWAY 395', ''):
+                    if not (stname is None or stname == "" or stname.isspace() == True):
+                        row[6] = (stname.rsplit(' ')[-1].strip())
+                    elif stname is None or stname == "" or stname.isspace() == True:
+                        if not (fulladdress is None or fulladdress[0].isdigit()):
+                            row[6] = (fulladdress.rsplit(' ')[-1].strip())
+                        else:
+                            row[6] = ""
+                    else:
+                        logging.info("Error parsing washoe street suffix")
+                else:
+                    row[11] = ""
 
-            # Update the row.
-            cursor.updateRow(row)
-    del cursor
+                # Postal Town
+                postal_town = row[41]
+                if not (postal_town is None or postal_town == '' or postal_town.isspace()==True):
+                    row[9] = postal_town
+                else:
+                    row[9] = ''
+                    
+                # Postal State
+                row[10] = 'NV'
+                
+                # Postal Zip
+                postal_zip = row[42]
+                if not (postal_zip is None or postal_zip == '' or postal_zip.isspace()==True):
+                    row[11] = postal_zip
+                else:
+                    row[11] = ''
+                    
+                # Owner Name
+                # set owner first name
+                ownfirst = row[44]
+                if not (ownfirst is None or ownfirst.isspace() == True):
+                    row[12] = ownfirst
+                else:
+                    row[12] = ""
+                
+                # own last
+                ownlast = row[45]
+                if not (ownlast is None or ownlast.isspace() == True):
+                    row[13] = ownlast
+                else:
+                    row[13] = ""
+                
+                # own full
+                if not (ownfirst is None and ownlast is None):
+                    row[14] = (ownfirst + " " + ownlast).strip()
+                else:
+                    row[14] = ""
+                    
+                # Mailing Address
+                if not (row[46] is None):  
+                    address1 = row[46].strip()
+                if not (row[47] is None):
+                    address2 = row[47].strip()
+                if not (address1 is None or address1=='' or address1.isspace()==True):
+                    row[15] = str((address1 + " " + address2).strip())
+                elif (address2 is None):
+                    row[15] = address1
+                else:
+                    row[15] = ''
+                
+                # Mailing City
+                mail_city = row[48]
+                if not (mail_city is None or mail_city=='' or mail_city.isspace()==True):
+                    row[16] = mail_city
+                else:
+                    row[16] = ''
+                    
+                # Mailing State
+                mail_state = row[49]
+                if not (mail_state is None or mail_state=='' or mail_state.isspace()==True):
+                    #row[17] = mail_state
+                    row[17] = mail_state[:2]
+                else:
+                    row[17] = ''
+                
+                # Mailing Zipcode
+                if not (row[50] is None):
+                    mail_zip = row[50].strip()
+                if not (mail_zip is None or mail_zip=='' or mail_zip.isspace()==True):
+                    row[18] = mail_zip[:5]
+                else:
+                    row[18] = ''
+                    
+                # Assessement Value
+                land_value = row[53]
+                if not(land_value is None or land_value==''):
+                    row[19] = land_value
+                else:
+                    row[19] = None
+                
+                improved_value = row[54]
+                if not (improved_value is None or improved_value==''):
+                    row[20] = improved_value
+                else:
+                    row[20] = None
+                        
+                assessed_sum = row[55]
+                if not (assessed_sum is None or assessed_sum==''):
+                    row[21] = assessed_sum
+                else:
+                    row[21] = None
+                
+                # Tax Value
+                taxland_value = row[56]
+                if not(taxland_value is None or taxland_value==''):
+                    row[22] = taxland_value
+                else:
+                    row[22] = None
+                
+                taximproved_value = row[57]
+                if not (taximproved_value is None or taximproved_value==''):
+                    row[23] = taximproved_value
+                else:
+                    row[23] = None
+                
+                tax_sum = row[58]
+                if not (tax_sum is None or tax_sum==''):
+                    row[24] = tax_sum
+                else:
+                    row[24] = None
+                
+                # Tax Year
+                tax_year = row[51]
+                if not (tax_year is None or tax_year=='' or tax_year.isspace()==True):
+                    row[25] = tax_year
+                else:
+                    row[25] = None
+                    
+                # County Land Use Code
+                county_luc = row[52]
+                if not (county_luc is None or county_luc=='' or county_luc.isspace()==True):
+                    row[26] = int(county_luc.split(",",1)[0].strip())
+                else:
+                    row[26] = None 
+                
+                # Year Built
+                year_built = row[59]
+                if not (year_built is None or year_built==''):
+                    row[28] = year_built
+                else:
+                    row[28] = None
+                    
+                # Units
+                units = row[63]
+                if not (units is None or units==''):
+                    row[29] = int(units)
+                else:
+                    row[29] = None
+                
+                # Bedrooms
+                bedrooms = row[61]
+                if not (bedrooms is None or bedrooms==''):
+                    row[30] = bedrooms
+                else:
+                    row[30] = None
+                
+                # Bathrooms
+                bathrooms = row[62]
+                if not (bathrooms is None or bathrooms==''):
+                    row[31] = bathrooms
+                else:
+                    row[31] = None
+                    
+                # Building Square Feet
+                building_sqft = row[43]
+                if not (building_sqft is None or building_sqft==''):
+                    row[32] = building_sqft
+                else:
+                    row[32] = None
 
-    # create a spatial reference object for the output coordinate system 
-    out_coordinate_system = arcpy.SpatialReference('NAD 1983 UTM Zone 10N') 
-    arcpy.Project_management(washoeParcels, parcel_out, out_coordinate_system)
+                # Update the row.
+                cursor.updateRow(row)
+        del cursor
 
-    print('New Washoe Parcels transformed')
-    logger.info('New Washoe Parcels Transformed')
+        # create a spatial reference object for the output coordinate system 
+        out_coordinate_system = arcpy.SpatialReference('NAD 1983 UTM Zone 10N') 
+        arcpy.Project_management(washoeParcels, parcel_out, out_coordinate_system)
+
+        print('New Washoe Parcels transformed')
+        logger.info('New Washoe Parcels Transformed')
     #--------------------------------------
     # MERGE
     #--------------------------------------

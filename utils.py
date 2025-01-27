@@ -158,8 +158,14 @@ def update_fc_from_dict(update_dict,key_field, fc,edit_session):
                         print (f"Updating row {total_count} at "+ strftime("%Y-%m-%d %H:%M:%S"))
                     for field, value in update_values.items():
                         index = cursor.fields.index(field)
+                        print(f"APN: {key_field_value}")
+                        print(f"Old Value: {row[index]}")
+                        print(f"New Value: {value}")
+                       
                         row[index] = value
                         print(field)
+
+
                     edit_session.startOperation()
                     cursor.updateRow(row)
                     edit_session.stopOperation()
