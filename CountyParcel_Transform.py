@@ -46,7 +46,7 @@ filePath = "F:/GIS/PARCELUPDATE/Workspace/"
 # database file path 
 sdeBase    = os.path.join(filePath, "Vector.sde/")
 sdeCollect = os.path.join(filePath, "Collection.sde")
-sdeTabular = os.path.join(filePath, "Tabular.sde")
+sdeTabular = os.path.join(filePath, "Tabular.sde/")
 
 # portal signin
 ## TRPA_ADMIN credentials 
@@ -172,7 +172,8 @@ trpaFields = [
 ['REGIONAL_LANDUSE_TRPA', 'TEXT', 'Regional Landuse', 50], 
 # Fields for soil, watershed, etc...
 ['ESTIMATED_COVERAGE_ALLOWED_TRPA', 'DOUBLE', "Estimate of Coverage Allowed (Bailey, sq.ft.)"],
-['ESTIMATED_PRCNT_COV_ALLOWED_TRPA', 'DOUBLE', "Estimated Percent Coverage Allowed (Bailey, sq.ft.)"],
+#['ESTIMATED_PRCNT_COV_ALLOWED_TRPA', 'DOUBLE', "Estimated Percent Coverage Allowed (Bailey, sq.ft.)"],
+['ESTIMATED_PRCNT_COV_ALLOWED_TRPA', 'SHORT', "Estimated Percent Coverage Allowed (Bailey, sq.ft.)"],
 ['IMPERVIOUS_SURFACE_SQFT_TRPA', 'DOUBLE', "Impervious Surface (Remote Sensing, sq.ft.)"],
 
 ['SOIL_1974_TRPA', 'TEXT','NRCS Soils 1974', 5],
@@ -226,7 +227,6 @@ logger.info("Script Started: " + str(FIRSTstartTimer) + "\n")
 
 # Setup Counties to run
 counties_to_run = ['El Dorado', 'Placer', 'Douglas', 'Washoe', 'Carson City']
-counties_to_run = ['Douglas']
 
 ##--------------------------------------------------------------------------------------------------------#
 ## SETUP SEND EMAIL WITH LOG FILE ##
@@ -237,7 +237,7 @@ fileToSend = log_file_path
 subject = "Parcel Transformation Log File"
 sender_email = "infosys@trpa.org"
 # password = ''
-receiver_email = "gis@trpa.gov"
+receiver_email = "afish@trpa.gov"
 #----------------------------------------------------------------------
 # FUNCTIONS
 #----------------------------------------------------------------------
@@ -656,11 +656,12 @@ try:
                 row[2] = "DG"
                 
                 # APO Address
-                house            = str(row[34]).strip()
-                street_direction = str(row[35]).strip()
-                street_name      = str(row[36]).strip()
-                street_suffix    = str(row[37]).strip()
-                unit             = str(row[38]).strip()
+                house            = str(row[34]).strip() if row[34] is not None else ""
+                street_direction = str(row[35]).strip() if row[35] is not None else ""
+                street_name      = str(row[36]).strip() if row[36] is not None else ""
+                street_suffix    = str(row[37]).strip() if row[37] is not None else ""
+                unit             = str(row[38]).strip() if row[38] is not None else ""
+
                 if not (street_name is None or street_name=='' or street_name.isspace()==True):
                     row[8] = re.sub(" +"," ", (house + " " + street_direction +" " + street_name+" " + street_suffix+" " + unit).strip())
                 else:
@@ -2269,589 +2270,299 @@ try:
     # log.info("The 'Owernshipe Type' field in the parcel data has been updated")
 
     ### Existing Landuse Attribute Update ----------------------------------------------------------------------------###
-    fields = ("COUNTY_LANDUSE_CODE_TRPA",
-            "COUNTY_LANDUSE_TRPA",  
-            "EXISTING_LANDUSE_TRPA", 
-            'JURISDICTION_TRPA')
+    fields = ("COUNTY_LANDUSE_CODE_TRPA", "COUNTY_LANDUSE_TRPA", "EXISTING_LANDUSE_TRPA", "JURISDICTION_TRPA")
+
+    # Define dictionaries for mapping land use codes
+    washoe_landuse = {
+        ('400', '410', '440', '500', '510', '520', '630', '640', '670', '720'): "Commercial",
+        ('210', '250'): "Condominium",
+        ('240',): "Condominium Common Area",
+        ('220', '230', '300', '310', '320', '330', '340', '350', '360'): "Multi-Family Residential",
+        ('600', '620'): "Open Space",
+        ('700', '710', 'PBRD'): "Public Service",
+        ('190',): "Recreation",
+        ('200',): "Single Family Residential",
+        ('420', '430'): "Tourist Accommodation",
+        ('100', '110', '120', '130', '140', '150', '160', '170', '180'): "Vacant",}
+    washoe_desc = {
+        '710': "Intracounty public utility",
+        '700': "Centrally assessed public utility",
+        '510': "Commercial Industrial: retail or office with Indus",
+        '500': "General industrial: light indust, trucking, warehs",
+        '440': "Resort commercial: ski, golf, sports, etc.",
+        '430': "Commercial hotel or motel",
+        '420': "Casino or hotel casino",
+        '410': "Offices, professional and business, banks, etc.",
+        '400': "General Commercial: retail, mixed, parking, school",
+        '340': "Ten or more units",
+        '330': "Five to Nine Units",
+        '320': "Three or four Units",
+        '310': "Two Single Family Units",
+        '300': "Duplex",
+        '250': "Condo or Townhouse valued as apartment use",
+        '240': "Common Area",
+        '210': "Condominium or Townhouse",
+        '200': "Single Family Residence",
+        '190': "Public Parks: vacant or improved",
+        '170': "Other, unbuildable: roads, restrictions, terrain",
+        '160': "Splinter, unbuildable: small size or shape",
+        '140': "Vacant, commercial",
+        '130': "Vacant, multi-residential",
+        '120': "Vacant, single family",
+        '110': "Vacant, under development",
+        '100': "Vacant, other or unknown" }
+    carson_city_landuse = {
+        ('400', '410', '420', '430', '440', '450', '460', '470'): "Commercial",
+        ('210', '220', '230', '240', '250'): "Condominium",
+        ('300', '310', '320', '330', '340', '350', '360', '370'): "Multi-Family Residential",
+        ('600', '610', '620', '630', '640'): "Open Space",
+        ('700', '710', '720', '730', '740'): "Public Service",
+        ('800', '810', '820', '830'): "Recreation",
+        ('200', '201', '202', '203', '204'): "Single Family Residential",
+        ('500', '510', '520', '530'): "Industrial",
+        ('100', '110', '120', '130', '140', '150', '160', '170', '180'): "Vacant",
+    }
+    carson_city_desc = {
+        '700': "Government buildings and public service facilities",
+        '720': "Educational institutions",
+        '740': "Public safety and emergency services",
+        '510': "Light industrial, warehouses",
+        '500': "General industrial",
+        '450': "Retail and mixed-use commercial",
+        '440': "Hotels and motels",
+        '420': "Casinos and entertainment venues",
+        '410': "Office spaces and business centers",
+        '400': "General commercial",
+        '340': "Ten or more residential units",
+        '330': "Five to nine residential units",
+        '320': "Three or four residential units",
+        '310': "Two single-family residences",
+        '300': "Duplex",
+        '250': "Condominium or townhouse",
+        '210': "Single-family condominium",
+        '200': "Single-family residence",
+        '800': "Public parks and recreational spaces",
+        '170': "Unbuildable land due to terrain restrictions",
+        '160': "Splinter parcels, unbuildable",
+        '140': "Vacant commercial land",
+        '130': "Vacant multi-residential land",
+        '120': "Vacant single-family land",
+        '100': "Other or unknown vacant land"
+    }
+    douglas_landuse = {
+        ('400', '402', '410', '411', '412', '440', '460', '470', '480', '500', '510', '560', '580', '582'): "Commercial",
+        ('210', '211'): "Condominium",
+        ('270',): "Condominium Common Area",
+        ('300', '310', '320', '330', '350', '390'): "Multi-Family Residential",
+        ('190',): "Open Space",
+        ('700', '710', '711', '910', '980', '970'): "Public Service",
+        ('450', '900', '970'): "Recreation",
+        ('200', '220', '230', '236', '240', '280', '282'): "Single Family Residential",
+        ('420', '430'): "Tourist Accommodation",
+        ('100', '110', '117', '120', '130', '140'): "Vacant"}
+    douglas_desc = {
+        '980': 'Special Purpose with Minor Improvements', '970': 'Special Purpose Common Area', '910': 'Cemeteries',
+        '900': 'Parks for Public Use', '711': 'Communication, Transportation, and Utility Property of a Local Nature Under Construction',
+        '710': 'Communication, Transportation, and Utility Property of a Local Nature', '700': 'Operating Communication, Transportation, and Utility Property of an Interstate or Intercounty Nature',
+        '582': 'Industrial with Minor Improvements - with structures insufficient to determine intended use',
+        '580': 'Industrial with Minor Improvements', '560': 'Industrial Auxiliary Area', '510': 'Commercial Industrial - retail or office use combined with Industrial use',
+        '500': 'General Industrial - light industry, trucking and warehousing, service, repair, etc.', '480': 'Commercial with Minor Improvements',
+        '470': 'Commercial Common Area', '460': 'Commercial Auxiliary Area', '450': 'Golf Course', '440': 'Commercial Recreation',
+        '430': 'Commercial Living Accommodations', '420': 'Casino or Hotel Casino', '410': 'Offices, Professional and Business Services',
+        '402': 'Parking and/or Parking Structures', '400': 'General Commercial', '390': 'Mixed Use with Multi-Family Residential as primary use',
+        '382': 'Multi-Family Residential with Minor Improvements - No livable structures', '380': 'Multi-Family Residential with Minor Improvements',
+        '370': 'Multi-Family Residential Common Area', '360': 'Multi-Family Residential Auxiliary Area', '350': 'Manufactured Home Park - Ten or More Manufactured Home Units',
+        '341': 'Five or More Units - High Rise Under Construction', '340': 'Five or More Units - High Rise', '333': 'Exempt or Partially Exempt Apartment Building',
+        '331': 'Five or More Units - Low Rise Under Construction', '330': 'Five or More Units - Low Rise', '321': 'Three to Four Units Under Construction',
+        '320': 'Three to Four Units', '313': 'Multi-Family Residence with Manufactured Home Conversion', '311': 'Two Single Family Units Under Construction',
+        '310': 'Two Single Family Units', '301': 'Duplex Under Construction', '300': 'Duplex', '290': 'Mixed Use with Single Family Residential as primary use',
+        '282': 'Single Family Residential with Minor Improvements - No livable structures', '280': 'Single Family Residential with Minor Improvements',
+        '270': 'Single Family Residential Common Area', '260': 'Single Family Residential Auxiliary Area', '240': 'Individual Residential Unit - Townhouse or Row House',
+        '236': 'Personal Property Manufactured Home Secured', '233': 'Secured Manufactured Home with Site Built Additions (Not Converted)',
+        '232': 'Manufactured Home - Unsecured with Site Built Additions', '231': 'Manufacture Home Conversions Pending', '230': 'Personal Property Manufactured Home on the Unsecured Roll',
+        '222': 'Manufactured Home (Converted) with Site Built Additions', '220': 'Manufactured Home Converted to Real Property', '211': 'Individual Unit in a Multiple Unit Building Under Construction',
+        '210': 'Individual Unit in a Multiple Unit Building', '201': 'Single Family Residence Under Construction', '200': 'Single Family Residence',
+        '190': 'Vacant - Public Use Lands', '150': 'Vacant - Industrial', '140': 'Vacant - Commercial', '130': 'Vacant - Multi-Residential',
+        '120': 'Vacant - Single Family Residential', '117': 'Vacant - Roads/Easements', '110': 'Vacant - Splinter and Other Unbuildable',
+        '108': 'Vacant - Patented Mining Claim, Not Mined', '100': 'Vacant - Unknown/Other'}
+    eldo_landuse = {
+        ('03', '29', '31', '32', '34', '36', '37', '38', '39', '41', '42', '43', '44', '45', '46', '47', '48', '65', '67', '68', '82', '91', '93'): "Commercial",
+        ('14',): "Condominium",
+        ('89',): "Condominium Common Area",
+        ('01', '07', '12', '13', '16', '18', '19', '28', '35'): "Multi-Family Residential",
+        ('25', '26', '50', '51', '52', '55', '56', '60', '70', '75', '79'): "Open Space",
+        ('90', '92', '94', '96', '97', '98', '99'): "Public Service",
+        ('61', '62', '63', '64'): "Recreation",
+        ('06', '11', '15', '22', '23'): "Single Family Residential",
+        ('33', '80', '81'): "Tourist Accommodation",
+        ('00', '02', '05', '17', '21', '24', '30', '40'): "Vacant"}
+    eldo_desc = {
+        '98': 'DEV MSC FIRE SUPPRESSION FACILITIES',
+        '96': 'DEV MSC CEMETERIES',
+        '94': 'DEV MSC SCHOOLS - LARGE (101+ STUDENTS)',
+        '93': 'DEV MSC SCHOOLS - MEDIUM (13-100 STUDENTS)',
+        '92': 'DEV MSC SCHOOLS - SMALL (1-12 STUDENTS)',
+        '90': 'UTL IND PUBLIC UTILITY (ON STATE ASSESSED ROLL)',
+        '84': 'DEV MSC TEMPORARY USE CODE FOR PROJECT 184',
+        '82': 'DEV COM PARKING LOT',
+        '81': 'DEV MSC UNDERLYING INTEREST IN TIME SHARE PROJ',
+        '79': 'RLU MSC ENV. SENSITIVE LAND - RESTRICTED USE',
+        '68': 'DEV COM MARINAS',
+        '65': 'DEV COM RESTAURANT',
+        '64': 'DEV MSC SKI RESORTS',
+        '63': 'DEV MSC CAMPGROUNDS',
+        '62': 'DEV MSC COMMUNITY ORIENTED FACILITIES',
+        '61': 'DEV MSC MISC. IMPROVED RECREATIONAL',
+        '60': 'VAC MSC VACANT RECREATIONAL LAND',
+        '50': 'TPZ MSC TIMBER PRESERVE ZONING - ACTIVE',
+        '48': 'DEV IND OFFICES',
+        '47': 'DEV IND HOSPITALS & CONVALESCENT HOSPITALS',
+        '46': 'DEV IND MEDICAL/DENTAL/VET OFFICES',
+        '45': 'DEV IND LIGHT MANUFACTURING',
+        '43': 'DEV IND WAREHOUSES',
+        '42': 'DEV IND MINI-WAREHOUSES (MINI-STORAGE)',
+        '41': 'DEV IND MISC. IMPROVED INDUSTRIAL PROPERTY',
+        '40': 'VAC IND VACANT INDUSTRIAL LAND',
+        '39': 'DEV COM SUPERMARKETS',
+        '38': 'DEV COM RETAIL STORES >15,000 SQ. FT.',
+        '37': 'DEV COM RETAIL STORES 5,001-15,000 SQ. FT.',
+        '36': 'DEV COM RETAIL STORES <=5,000 SQ. FT.',
+        '35': 'DEV COM MOBILE HOME PARKS',
+        '34': 'DEV COM SERVICE STATION',
+        '33': 'DEV COM MOTEL, HOTEL',
+        '31': 'DEV COM MISC. IMPROVED COMMERCIAL',
+        '30': 'VAC COM VACANT COMMERCIAL LAND',
+        '29': 'DEV MSC RURAL NON-RES. IMPROVEMENT 2.51-20.0 AC.',
+        '26': 'AGP MSC RURAL RESTRICTIVE ZONING - NON-RENEWAL',
+        '25': 'AGP MSC RURAL RESTRICTIVE ZONING - CLCA (ACTIVE)',
+        '24': 'VAC RES RURAL RES. LAND 20+ MINOR NON-RES IMPR',
+        '23': 'DEV RES RURAL RES. 20+ AC. 1 RES. UNIT',
+        '22': 'DEV RES RURAL RES. 2.51-20.0 AC. 1 SF UNIT',
+        '21': 'VAC RES VAC RURAL RES LAND 2.51-20.0 AC. 1 UNIT',
+        '17': 'VAC MSC SUBJ. TO OPEN SPACE CONTRACT (NOT CLCA)',
+        '16': 'DEV RES MOBILE HOME ON RENTED LAND',
+        '15': 'DEV RES RESIDENCE ON LEASED LAND',
+        '14': 'DEV MFR CONDOMINIUMS & TOWNHOUSES',
+        '13': 'DEV MFR MULTI-RESIDENTIAL 4+ UNITS',
+        '12': 'DEV MFR MULTI-RESIDENTIAL 2-3 UNITS',
+        '11': 'DEV RES SINGLE FAM. RES. <=2.5 AC.(INC. MAN. HMS',
+        '07': 'DEV MFR RETIREMENT HOUSING',
+        '05': 'VAC MFR VACANT MULTI-RES. LAND 4+ UNITS ALLOWED',
+        '03': 'DEV COM PLACE OF WORSHIP',
+        '02': 'VAC RES NON-RES. IMPROVEMENTS <=2.5 AC.',
+        '00': 'VAC RES VACANT RES. LAND <=2.5 AC. 1-3 UNITS'}
+    placer_landuse = {
+        ('07', '11', '12', '13', '14', '15', '17', '19', '21', '22', '23', '24', '25', '26', '27', '29', '31', '32', '36', '37', '38', '39', '62', '63', '71', '88'): "Commercial",
+        '04': "Condominium",
+        '89': "Condominium Common Area",
+        ('02', '03', '05', '09', '28'): "Multi-Family Residential",
+        ('56', '55', '60', '61', '87', '90'): "Open Space",
+        ('72', '76', '77', '81'): "Public Service",
+        ('65', '66', '67', '68', '69'): "Recreation",
+        ('01', '08', '16'): "Single Family Residential",
+        ('06', '18', '64'): "Tourist Accommodation",
+        ('00', '10', '20', '30'): "Vacant"}
+    placer_desc = {'90': 'GREENBELT',
+        '89': 'COMMON AREA',
+        '88': 'HIGHWAYS, ROADS, STREETS',
+        '87': 'RIVERS, LAKES, RESERVOIR, CANAL',
+        '81': 'UTILITIES, PUBLIC & PRIVATE',
+        '77': 'CEMETERIES',
+        '76': 'MISC. PUBLIC BUILDINGS',
+        '72': 'SCHOOLS',
+        '71': 'CHURCHES',
+        '69': 'MISCELLANEOUS RECREATIONAL',
+        '68': 'CAMPS & PARKS, GENERAL',
+        '67': 'SKI FACILITY',
+        '66': 'GOLF COURSE',
+        '65': 'TENNIS, SWIMMING CLUBS',
+        '64': 'LODGES, HALLS',
+        '63': 'MARINA, PIER',
+        '62': 'THEATER, BOWLING ALLEY',
+        '61': 'NON-PROFIT CAMPS/PARKS',
+        '60': 'CONSERVATION EASEMENT RESTRICTIONS',
+        '56': 'TIMBERLAND, ZONED TPZ',
+        '55': 'TIMBERLAND, UNRESTRICTED',
+        '39': 'MISCELLANEOUS INDUSTRIAL',
+        '38': 'WAREHOUSE',
+        '37': 'MINI-STORAGE, COVERED STORAGE',
+        '36': 'UNCOVERED STORAGE, WRECKING YARD',
+        '32': 'HEAVY INDUSTRIAL',
+        '31': 'LIGHT INDUSTRIAL',
+        '30': 'VACANT INDUSTRIAL',
+        '29': "MISCELLANEOUS COMM'L",
+        '28': 'MOBILE HOME PARK',
+        '27': 'PARKING LOTS',
+        '26': 'AUTO SALES, REPAIR',
+        '25': 'SERVICE STATION',
+        '24': 'MINI-MARKET WITH GAS',
+        '23': "BANKS, S&L'S, CREDIT UNION",
+        '22': 'FAST FOOD RESTAURANT',
+        '21': 'RESTAURANTS, COCKTAIL LOUNGES',
+        '20': 'VACANT, COMMERCIAL',
+        '19': 'OFFICE MEDICAL/DENTAL',
+        '18': 'HOTELS, MOTELS, RESORTS',
+        '17': 'OFFICE GENERAL',
+        '16': 'RESIDENCE ON COMMERCIAL LAND',
+        '15': 'SHOPPING CENTER',
+        '14': 'OFFICE CONDO',
+        '13': 'MINI-MARKETS, NO GAS',
+        '12': 'SUBURBAN STORE',
+        '11': 'COMMERCIAL STORE',
+        '10': 'VACANT, SUBDIVIDED RESIDENTIAL',
+        '09': 'MOBILE HOME IN M H PARK',
+        '08': 'MOBILE HOME OUTSIDE OF PARK',
+        '07': 'RESIDENTIAL, AUXILIARY IMP',
+        '06': 'TIMESHARES',
+        '05': 'APARTMENTS, 4 UNITS OR MORE',
+        '04': 'SINGLE FAM RES, CONDO',
+        '03': '3 SINGLE FAM RES, TRIPLEX',
+        '02': '2 SINGLE FAM RES, DUPLEX',
+        '01': 'SINGLE FAM RES, HALF PLEX',
+        '00': 'VACANT, ALL TYPES-NOT ASGND'}
 
     with arcpy.da.UpdateCursor(ParcelLayer, fields) as cursor:
         for row in cursor:
-            ctyluc = str(row[0])
+            ctyluc = str(row[0]).strip() if row[0] else None
             cty = row[3]
-            # set Washoe county land use
-            # set TRPA Land Use Description
-            if (row[0] != None or row[0] != "") and (row[3] == 'WA'):
-                if ctyluc in ('400', '410', '440', '500', '510', '520', '630', '640', '670', '720'):
-                    row[2] = "Commercial"
-                elif ctyluc in ('210', '250'):
-                    row[2] = "Condominium"
-                elif ctyluc in ('240'):
-                    row[2] = "Condominium Common Area"
-                elif ctyluc in ('220', '230', '300', '310', '320', '330', '340', '350', '360'):
-                    row[2] = "Multi-Family Residential"
-                elif ctyluc in ('600', '620'):
-                    row[2] = "Open Space"
-                elif ctyluc in ('700', '710', 'PBRD'):
-                    row[2] = "Public Service"
-                elif ctyluc in ('190'):
-                    row[2] = "Recreation"
-                elif ctyluc in ('200'):
-                    row[2] = "Single Family Residential"     
-                elif ctyluc in ('420', '430'):
-                    row[2] = "Tourist Accommodation"
-                elif ctyluc in ('100', '110', '120', '130', '140', '150', '160', '170', '180'):
-                    row[2] = "Vacant"            
-                elif ctyluc is None:
-                    row[2] == ''
-            if (row[0] != None or row[0] != "") and (row[3] == 'WA'):
-                if ctyluc in ('710'):
-                    row[1] = "Intracounty public utility"
-                elif ctyluc == '700':
-                    row[1] = 'Centrally assessed public utility'
-                elif ctyluc == '510':
-                    row[1] = 'Commercial Industrial: retail or office with Indus'
-                elif ctyluc == '500':
-                    row[1] = 'General industrial: light indust, trucking, warehs'
-                elif ctyluc == '440':
-                    row[1] = 'Resort commercial: ski, golf, sports, etc.'
-                elif ctyluc == '430':
-                    row[1] = 'Commercial hotel or motel'
-                elif ctyluc == '420':
-                    row[1] = 'Casino or hotel casino'
-                elif ctyluc == '410':
-                    row[1] = 'Offices, professional and business, banks, etc.'
-                elif ctyluc == '400':
-                    row[1] = 'General Commercial: retail, mixed, parking, school'
-                elif ctyluc == '340':
-                    row[1] = 'Ten or more units'
-                elif ctyluc == '330':
-                    row[1] = 'Five to Nine Units'
-                elif ctyluc == '320':
-                    row[1] = 'Three or four Units'
-                elif ctyluc == '310':
-                    row[1] = 'Two Single Family Units'
-                elif ctyluc == '300':
-                    row[1] = 'Duplex'
-                elif ctyluc == '250':
-                    row[1] = 'Condo or Townhouse valued as apartment use'
-                elif ctyluc == '240':
-                    row[1] = 'Common Area'
-                elif ctyluc == '210':
-                    row[1] = 'Condominium or Townhouse'
-                elif ctyluc == '200':
-                    row[1] = 'Single Family Residence'
-                elif ctyluc == '190':
-                    row[1] = 'Public Parks: vacant or improved'
-                elif ctyluc == '170':
-                    row[1] = 'Other, unbuildable: roads, restrictions, terrain'
-                elif ctyluc == '160':
-                    row[1] = 'Splinter, unbuildable: small size or shape'
-                elif ctyluc == '140':
-                    row[1] = 'Vacant, commercial'
-                elif ctyluc == '130':
-                    row[1] = 'Vacant, multi-residential'
-                elif ctyluc == '120':
-                    row[1] = 'Vacant, single family'
-                elif ctyluc == '110':
-                    row[1] = 'Vacant, under development'
-                elif ctyluc == '100':
-                    row[1] = 'Vacant, other or unknown'            
-                elif ctyluc is None:
-                    row[1] == ''
-                cursor.updateRow(row)
-            # Set Carson City County Land Use Descriptions
-            if (row[0] != None or row[0] != "") and (row[3] == 'CC'):
-                if ctyluc in ('400', '401', '402', '403', '404', '408', '410', '411', 
-                            '412', '440', '441', '460', '470', '480', '482', '490', 
-                            '500', '501', '510', '511', '512', '513', '520', '521', 
-                            '560', '570', '580', '582', '590', '624', '625', '694', 
-                            '800', '820', '830', '840', '880', '882', '890', '920', 
-                            '921', '930', '960', '980', '990'):
-                    row[2] = "Commercial"
-                elif ctyluc in ('210', '211'):
-                    row[2] = "Condominium"
-                elif ctyluc == '970':
-                    row[2] = "Condominium Common Area"
-                elif ctyluc in ('240', '241', '300', '301', '310', '311', '313', '320', 
-                                '321', '330', '331', '333', '340', '341', '350', '360', 
-                                '370', '380', '382', '390', '698'):
-                    row[2] = "Multi-Family Residential"
-                elif ctyluc in ('190', '600', '610', '612', '613', '614', '615', '616', 
-                                '618', '620', '695', '696', '697', '810'):
-                    row[2] = "Open Space"
-                elif ctyluc in ('190', '700', '710', '711', '720', '731', '732', '733', '780', 
-                                '790', '910', '922'):
-                    row[2] = "Public Service"
-                elif ctyluc in ('450', '900'):
-                    row[2] = "Recreation"
-                elif ctyluc in ('200', '201', '220', '222', '230', '231', '232', '260', 
-                                '270', '280', '282', '290', '622', '692', '693'):
-                    row[2] = "Single Family Residential"     
-                elif ctyluc in ('420', '421', '430', '431', '432', '514'):
-                    row[2] = "Tourist Accommodation"
-                elif ctyluc in ('100', '108', '110', '117', '120', '130', '140', '150', '160'):
-                    row[2] = "Vacant"
-                elif ctyluc is None:
-                    row[2] == ''
-            if (row[0] != None or row[0] != "") and (row[3] == 'CC'):
-                if ctyluc == '980':
-                    row[1] = 'Special Purpose with Minor Improvements'
-                elif ctyluc == '320':
-                    row[1] = 'Three to Four Units'
-                elif ctyluc == '280':
-                    row[1] = 'Single Family Residential with Minor Improvements'
-                elif ctyluc == '190':
-                    row[1] = 'Vacant - Public Use Lands'
-                elif ctyluc == '120':
-                    row[1] = 'Vacant - Single Family Residential' 
-                elif ctyluc is None:
-                    row[1] == ''
-                cursor.updateRow(row)           
-            # update Douglas Land Use descriptions        
-            if (row[0] != None or row[0] != "") and (row[3] == 'DG'):
-                if ctyluc in ('400', '402', '410', '411', '412', 
-                            '440', '460', '470', '480', '500', 
-                            '510', '560', '580', '582'):
-                    row[2] = "Commercial"
-                elif ctyluc in ('210', '211'):
-                    row[2] = "Condominium"
-                elif ctyluc == '270':
-                    row[2] = "Condominium Common Area"
-                elif ctyluc in ('300', '310', '320', '330', '350', '390'):
-                    row[2] = "Multi-Family Residential"
-                elif ctyluc == '190':
-                    row[2] = "Open Space"
-                elif ctyluc in ('700', '710', '711', '910', '980', '970'):
-                    row[2] = "Public Service"
-                elif ctyluc in ('450', '900', '970'):
-                    row[2] = "Recreation"
-                elif ctyluc in ('200', '220', '230', '236', '240', '280', '282'):
-                    row[2] = "Single Family Residential"     
-                elif ctyluc in ('420', '430'):
-                    row[2] = "Tourist Accommodation"
-                elif ctyluc in ('100', '110', '117', '120', '130', '140'):
-                    row[2] = "Vacant"
-                elif ctyluc is None:
-                    row[2] == ''
-            if (row[0] != None or row[0] != "" or ctyluc.isspace() != True) and (row[3] == 'DG'):
-                if ctyluc == '980':
-                    row[1] = 'Special Purpose with Minor Improvements'
-                elif ctyluc == '970':
-                    row[1] = 'Special Purpose Common Area'
-                elif ctyluc == '910':
-                    row[1] = 'Cemeteries'
-                elif ctyluc == '900':
-                    row[1] = 'Parks for Public Use'
-                elif ctyluc == '711':
-                    row[1] = 'Communication, Transportation, and Utility Property of a Local Nature Under Construction'
-                elif ctyluc == '710':
-                    row[1] = 'Communication, Transportation, and Utility Property of a Local Nature'
-                elif ctyluc == '700':
-                    row[1] = 'Operating Communication, Transportation, and Utility Property of an Interstate or Intercounty Nature'
-                elif ctyluc == '582':
-                    row[1] = 'Industrial with Minor Improvements - with structures insufficient to determine intended use'
-                elif ctyluc == '580':
-                    row[1] = 'Industrial with Minor Improvements'
-                elif ctyluc == '560':
-                    row[1] = 'Industrial Auxiliary Area'
-                elif ctyluc == '510':
-                    row[1] = 'Commercial Industrial - retail or office use combined with Industrial use'
-                elif ctyluc == '500':
-                    row[1] = 'General Industrial - light industry, trucking and warehousing, service, repair, etc.'
-                elif ctyluc == '480':
-                    row[1] = 'Commercial with Minor Improvements'
-                elif ctyluc == '470':
-                    row[1] = 'Commercial Common Area'
-                elif ctyluc == '460':
-                    row[1] = 'Commercial Auxiliary Area'
-                elif ctyluc == '450':
-                    row[1] = 'Golf Course'
-                elif ctyluc == '440':
-                    row[1] = 'Commercial Recreation'
-                elif ctyluc == '430':
-                    row[1] = 'Commercial Living Accommodations'
-                elif ctyluc == '420':
-                    row[1] = 'Casino or Hotel Casino'
-                elif ctyluc == '410':
-                    row[1] = 'Offices, Professional and Business Services'
-                elif ctyluc == '402':
-                    row[1] = 'Parking and/or Parking Structures'
-                elif ctyluc == '400':
-                    row[1] = 'General Commercial'
-                elif ctyluc == '390':
-                    row[1] = 'Mixed Use with Multi-Family Residential as primary use'
-                elif ctyluc == '382':
-                    row[1] = 'Multi-Family Residential with Minor Improvements - No livable structures'
-                elif ctyluc == '380':
-                    row[1] = 'Multi-Family Residential with Minor Improvements'
-                elif ctyluc == '370':
-                    row[1] = 'Multi-Family Residential Common Area'
-                elif ctyluc == '360':
-                    row[1] = 'Multi-Family Residential Auxiliary Area'
-                elif ctyluc == '350':
-                    row[1] = 'Manufactured Home Park - Ten or More Manufactured Home Units'
-                elif ctyluc == '341':
-                    row[1] = 'Five or More Units - High Rise Under Construction'
-                elif ctyluc == '340':
-                    row[1] = 'Five or More Units - High Rise'
-                elif ctyluc == '333':
-                    row[1] = 'Exempt or Partially Exempt Apartment Building'
-                elif ctyluc == '331':
-                    row[1] = 'Five or More Units - Low Rise Under Construction'
-                elif ctyluc == '330':
-                    row[1] = 'Five or More Units - Low Rise'
-                elif ctyluc == '321':
-                    row[1] = 'Three to Four Units Under Construction'
-                elif ctyluc == '320':
-                    row[1] = 'Three to Four Units'
-                elif ctyluc == '313':
-                    row[1] = 'Multi-Family Residence with Manufactured Home Conversion'
-                elif ctyluc == '311':
-                    row[1] = 'Two Single Family Units Under Construction'
-                elif ctyluc == '310':
-                    row[1] = 'Two Single Family Units'
-                elif ctyluc == '301':
-                    row[1] = 'Duplex Under Construction'
-                elif ctyluc == '300':
-                    row[1] = 'Duplex'
-                elif ctyluc == '290':
-                    row[1] = 'Mixed Use with Single Family Residential as primary use'
-                elif ctyluc == '282':
-                    row[1] = 'Single Family Residential with Minor Improvements - No livable structures'
-                elif ctyluc == '280':
-                    row[1] = 'Single Family Residential with Minor Improvements'
-                elif ctyluc == '270':
-                    row[1] = 'Single Family Residential Common Area'
-                elif ctyluc == '260':
-                    row[1] = 'Single Family Residential Auxiliary Area'
-                elif ctyluc == '240':
-                    row[1] = 'Individual Residential Unit - Townhouse or Row House'
-                elif ctyluc == '236':
-                    row[1] = 'Personal Property Manufactured Home Secured'
-                elif ctyluc == '233':
-                    row[1] = 'Secured Manufactured Home with Site Built Additions (Not Converted)'
-                elif ctyluc == '232':
-                    row[1] = 'Manufactured Home - Unsecured with Site Built Additions'
-                elif ctyluc == '231':
-                    row[1] = 'Manufacture Home Conversions Pending'
-                elif ctyluc == '230':
-                    row[1] = 'Personal Property Manufactured Home on the Unsecured Roll'
-                elif ctyluc == '222':
-                    row[1] = 'Manufactured Home (Converted) with Site Built Additions'
-                elif ctyluc == '220':
-                    row[1] = 'Manufactured Home Converted to Real Property'
-                elif ctyluc == '211':
-                    row[1] = 'Individual Unit in a Multiple Unit Building Under Construction'
-                elif ctyluc == '210':
-                    row[1] = 'Individual Unit in a Multiple Unit Building'
-                elif ctyluc == '201':
-                    row[1] = 'Single Family Residence Under Construction'
-                elif ctyluc == '200':
-                    row[1] = 'Single Family Residence'
-                elif ctyluc == '190':
-                    row[1] = 'Vacant - Public Use Lands'
-                elif ctyluc == '150':
-                    row[1] = 'Vacant - Industrial'
-                elif ctyluc == '140':
-                    row[1] = 'Vacant - Commercial'
-                elif ctyluc == '130':
-                    row[1] = 'Vacant - Multi-Residential'
-                elif ctyluc == '120':
-                    row[1] = 'Vacant - Single Family Residential'
-                elif ctyluc == '117':
-                    row[1] = 'Vacant - Roads/Easements'
-                elif ctyluc == '110':
-                    row[1] = 'Vacant - Splinter and Other Unbuildable'
-                elif ctyluc == '108':
-                    row[1] = 'Vacant - Patented Mining Claim, Not Mined'
-                elif ctyluc == '100':
-                    row[1] = 'Vacant - Unknown/Other'
-                elif ctyluc is None:
-                    row[1] == ''
-                cursor.updateRow(row)        
-            # Set El Dorado County Land Use Description fields
-            if (row[0] != None or row[0] != "") and (row[3] == 'EL'):
-                if ctyluc in ('03', '29', '31', '32', '34', '36', '37', '38', '39', '41', '42', '43', '44', '45', '46', '47', '48', 
-                            '65', '67', '68', '82', '91', '93'):
-                    row[2] = "Commercial"
-                elif ctyluc == '14':
-                    row[2] = "Condominium"
-                elif ctyluc == '89':
-                    row[2] = "Condominium Common Area"
-                elif ctyluc in ('01', '07', '12', '13', '16', '18', '19', '28', '35'):
-                    row[2] = "Multi-Family Residential"
-                elif ctyluc in ('25', '26', '50', '51', '52', '55', '56', '60', '70', '75', '79'):
-                    row[2] = "Open Space"
-                elif ctyluc in ('90', '92', '94', '96', '97', '98', '99'):
-                    row[2] = "Public Service"
-                elif ctyluc in ('61', '62', '63', '64'):
-                    row[2] = "Recreation"
-                elif ctyluc in ('06', '11', '15', '22', '23'):
-                    row[2] = "Single Family Residential"     
-                elif ctyluc in ('33', '80', '81'):
-                    row[2] = "Tourist Accommodation"
-                elif ctyluc in ('00', '02', '05', '17', '21', '24', '30', '40'):
-                    row[2] = "Vacant"
-                elif ctyluc is None:
-                    row[2] == ''
-            if (row[0] != None or row[0] != "") and (row[3] == 'EL'):
-                if ctyluc == '98':
-                    row[1] = 'DEV MSC FIRE SUPPRESSION FACILITIES'
-                elif ctyluc == '96':
-                    row[1] = 'DEV MSC CEMETERIES'
-                elif ctyluc == '94':
-                    row[1] = 'DEV MSC SCHOOLS - LARGE (101+ STUDENTS)'
-                elif ctyluc == '93':
-                    row[1] = 'DEV MSC SCHOOLS - MEDIUM (13-100 STUDENTS)'
-                elif ctyluc == '92':
-                    row[1] = 'DEV MSC SCHOOLS - SMALL (1-12 STUDENTS)'
-                elif ctyluc == '90':
-                    row[1] = 'UTL IND PUBLIC UTILITY (ON STATE ASSESSED ROLL)'
-                elif ctyluc == '84':
-                    row[1] = 'DEV MSC TEMPORARY USE CODE FOR PROJECT 184'
-                elif ctyluc == '82':
-                    row[1] = 'DEV COM PARKING LOT'
-                elif ctyluc == '81':
-                    row[1] = 'DEV MSC UNDERLYING INTEREST IN TIME SHARE PROJ'
-                elif ctyluc == '79':
-                    row[1] = 'RLU MSC ENV. SENSITIVE LAND - RESTRICTED USE'
-                elif ctyluc == '68':
-                    row[1] = 'DEV COM MARINAS'
-                elif ctyluc == '65':
-                    row[1] = 'DEV COM RESTAURANT'
-                elif ctyluc == '64':
-                    row[1] = 'DEV MSC SKI RESORTS'
-                elif ctyluc == '63':
-                    row[1] = 'DEV MSC CAMPGROUNDS'
-                elif ctyluc == '62':
-                    row[1] = 'DEV MSC COMMUNITY ORIENTED FACILITIES'
-                elif ctyluc == '61':
-                    row[1] = 'DEV MSC MISC. IMPROVED RECREATIONAL'
-                elif ctyluc == '60':
-                    row[1] = 'VAC MSC VACANT RECREATIONAL LAND'
-                elif ctyluc == '50':
-                    row[1] = 'TPZ MSC TIMBER PRESERVE ZONING - ACTIVE'
-                elif ctyluc == '48':
-                    row[1] = 'DEV IND OFFICES'
-                elif ctyluc == '47':
-                    row[1] = 'DEV IND HOSPITALS & CONVALESCENT HOSPITALS'
-                elif ctyluc == '46':
-                    row[1] = 'DEV IND MEDICAL/DENTAL/VET OFFICES'
-                elif ctyluc == '45':
-                    row[1] = 'DEV IND LIGHT MANUFACTURING'
-                elif ctyluc == '43':
-                    row[1] = 'DEV IND WAREHOUSES'
-                elif ctyluc == '42':
-                    row[1] = 'DEV IND MINI-WAREHOUSES (MINI-STORAGE)'
-                elif ctyluc == '41':
-                    row[1] = 'DEV IND MISC. IMPROVED INDUSTRIAL PROPERTY'
-                elif ctyluc == '40':
-                    row[1] = 'VAC IND VACANT INDUSTRIAL LAND'
-                elif ctyluc == '39':
-                    row[1] = 'DEV COM SUPERMARKETS'
-                elif ctyluc == '38':
-                    row[1] = 'DEV COM RETAIL STORES >15,000 SQ. FT.'
-                elif ctyluc == '37':
-                    row[1] = 'DEV COM RETAIL STORES 5,001-15,000 SQ. FT.'
-                elif ctyluc == '36':
-                    row[1] = 'DEV COM RETAIL STORES <=5,000 SQ. FT.'
-                elif ctyluc == '35':
-                    row[1] = 'DEV COM MOBILE HOME PARKS'
-                elif ctyluc == '34':
-                    row[1] = 'DEV COM SERVICE STATION'
-                elif ctyluc == '33':
-                    row[1] = 'DEV COM MOTEL, HOTEL'
-                elif ctyluc == '31':
-                    row[1] = 'DEV COM MISC. IMPROVED COMMERCIAL'
-                elif ctyluc == '30':
-                    row[1] = 'VAC COM VACANT COMMERCIAL LAND'
-                elif ctyluc == '29':
-                    row[1] = 'DEV MSC RURAL NON-RES. IMPROVEMENT 2.51-20.0 AC.'
-                elif ctyluc == '26':
-                    row[1] = 'AGP MSC RURAL RESTRICTIVE ZONING - NON-RENEWAL'
-                elif ctyluc == '25':
-                    row[1] = 'AGP MSC RURAL RESTRICTIVE ZONING - CLCA (ACTIVE)'
-                elif ctyluc == '24':
-                    row[1] = 'VAC RES RURAL RES. LAND 20+ MINOR NON-RES IMPR'
-                elif ctyluc == '23':
-                    row[1] = 'DEV RES RURAL RES. 20+ AC. 1 RES. UNIT'
-                elif ctyluc == '22':
-                    row[1] = 'DEV RES RURAL RES. 2.51-20.0 AC. 1 SF UNIT'
-                elif ctyluc == '21':
-                    row[1] = 'VAC RES VAC RURAL RES LAND 2.51-20.0 AC. 1 UNIT'
-                elif ctyluc == '17':
-                    row[1] = 'VAC MSC SUBJ. TO OPEN SPACE CONTRACT (NOT CLCA)'
-                elif ctyluc == '16':
-                    row[1] = 'DEV RES MOBILE HOME ON RENTED LAND'
-                elif ctyluc == '15':
-                    row[1] = 'DEV RES RESIDENCE ON LEASED LAND'
-                elif ctyluc == '14':
-                    row[1] = 'DEV MFR CONDOMINIUMS & TOWNHOUSES'
-                elif ctyluc == '13':
-                    row[1] = 'DEV MFR MULTI-RESIDENTIAL 4+ UNITS'
-                elif ctyluc == '12':
-                    row[1] = 'DEV MFR MULTI-RESIDENTIAL 2-3 UNITS'
-                elif ctyluc == '11':
-                    row[1] = 'DEV RES SINGLE FAM. RES. <=2.5 AC.(INC. MAN. HMS'
-                elif ctyluc == '07':
-                    row[1] = 'DEV MFR RETIREMENT HOUSING'
-                elif ctyluc == '05':
-                    row[1] = 'VAC MFR VACANT MULTI-RES. LAND 4+ UNITS ALLOWED'
-                elif ctyluc == '03':
-                    row[1] = 'DEV COM PLACE OF WORSHIP'
-                elif ctyluc == '02':
-                    row[1] = 'VAC RES NON-RES. IMPROVEMENTS <=2.5 AC.'
-                elif ctyluc == '00':
-                    row[1] = 'VAC RES VACANT RES. LAND <=2.5 AC. 1-3 UNITS'
-                elif ctyluc is None:
-                    row[1] == ''
-                cursor.updateRow(row)
-            # set Placer TRPA land use description
-            if (row[0] != None or row[0] != "") and (row[3] == 'PL'):
-                if ctyluc in ('07', '11', '12', '13', '14', '15', '17', '19', '21', '22', '23', 
-                            '24', '25', '26', '27', '29', '31', '32', '36', '37', '38', 
-                            '39', '62', '63', '71', '88'):
-                    row[2] = "Commercial"
-                elif ctyluc == ('04'):
-                    row[2] = "Condominium"
-                elif ctyluc == '89':
-                    row[2] = "Condominium Common Area"
-                elif ctyluc in ('02', '03', '04', '05', '09', '28'):
-                    row[2] = "Multi-Family Residential"
-                elif ctyluc in ('56', '55', '60', '61', '87', '90'):
-                    row[2] = "Open Space"
-                elif ctyluc in ('72', '76', '77', '81'):
-                    row[2] = "Public Service"
-                elif ctyluc in ('65', '66', '67', '68', '69'):
-                    row[2] = "Recreation"
-                elif ctyluc in ('01', '08', '16'):
-                    row[2] = "Single Family Residential"     
-                elif ctyluc in ('06', '18', '64'):
-                    row[2] = "Tourist Accommodation"
-                elif ctyluc in ('00', '10', '20', '30'):
-                    row[2] = "Vacant"
-                elif ctyluc is None:
-                    row[2] == ''
-            if (row[0] != None or row[0] != "") and (row[3] == 'PL'):
-                if ctyluc == '90':
-                    row[1] = 'GREENBELT'
-                elif ctyluc == '89':
-                    row[1] = 'COMMON AREA'
-                elif ctyluc == '88':
-                    row[1] = 'HIGHWAYS, ROADS, STREETS'
-                elif ctyluc == '87':
-                    row[1] = 'RIVERS, LAKES, RESERVOIR, CANAL'
-                elif ctyluc == '81':
-                    row[1] = 'UTILITIES, PUBLIC & PRIVATE'
-                elif ctyluc == '77':
-                    row[1] = 'CEMETERIES'
-                elif ctyluc == '76':
-                    row[1] = 'MISC. PUBLIC BUILDINGS'
-                elif ctyluc == '72':
-                    row[1] = 'SCHOOLS'
-                elif ctyluc == '71':
-                    row[1] = 'CHURCHES'
-                elif ctyluc == '69':
-                    row[1] = 'MISCELLANEOUS RECREATIONAL'
-                elif ctyluc == '68':
-                    row[1] = 'CAMPS & PARKS, GENERAL'
-                elif ctyluc == '67':
-                    row[1] = 'SKI FACILITY'
-                elif ctyluc == '66':
-                    row[1] = 'GOLF COURSE'
-                elif ctyluc == '65':
-                    row[1] = 'TENNIS, SWIMMING CLUBS'
-                elif ctyluc == '64':
-                    row[1] = 'LODGES, HALLS'
-                elif ctyluc == '63':
-                    row[1] = 'MARINA, PIER'
-                elif ctyluc == '62':
-                    row[1] = 'THEATER, BOWLING ALLEY'
-                elif ctyluc == '61':
-                    row[1] = 'NON-PROFIT CAMPS/PARKS'
-                elif ctyluc == '60':
-                    row[1] = 'CONSERVATION EASEMENT RESTRICTIONS'
-                elif ctyluc == '56':
-                    row[1] = 'TIMBERLAND, ZONED TPZ'
-                elif ctyluc == '55':
-                    row[1] = 'TIMBERLAND, UNRESTRICTED'
-                elif ctyluc == '39':
-                    row[1] = 'MISCELLANEOUS INDUSTRIAL'
-                elif ctyluc == '38':
-                    row[1] = 'WAREHOUSE'
-                elif ctyluc == '37':
-                    row[1] = 'MINI-STORAGE, COVERED STORAGE'
-                elif ctyluc == '36':
-                    row[1] = 'UNCOVERED STORAGE, WRECKING YARD'
-                elif ctyluc == '32':
-                    row[1] = 'HEAVY INDUSTRIAL'
-                elif ctyluc == '31':
-                    row[1] = 'LIGHT INDUSTRIAL'
-                elif ctyluc == '30':
-                    row[1] = 'VACANT INDUSTRIAL'
-                elif ctyluc == '29':
-                    row[1] = "MISCELLANEOUS COMM'L"
-                elif ctyluc == '28':
-                    row[1] = 'MOBILE HOME PARK'
-                elif ctyluc == '27':
-                    row[1] = 'PARKING LOTS'
-                elif ctyluc == '26':
-                    row[1] = 'AUTO SALES, REPAIR'
-                elif ctyluc == '25':
-                    row[1] = 'SERVICE STATION'
-                elif ctyluc == '24':
-                    row[1] = 'MINI-MARKET WITH GAS'
-                elif ctyluc == '23':
-                    row[1] = "BANKS, S&L'S, CREDIT UNION"
-                elif ctyluc == '22':
-                    row[1] = 'FAST FOOD RESTAURANT'
-                elif ctyluc == '21':
-                    row[1] = 'RESTAURANTS, COCKTAIL LOUNGES'
-                elif ctyluc == '20':
-                    row[1] = 'VACANT, COMMERCIAL'
-                elif ctyluc == '19':
-                    row[1] = 'OFFICE MEDICAL/DENTAL'
-                elif ctyluc == '18':
-                    row[1] = 'HOTELS, MOTELS, RESORTS'
-                elif ctyluc == '17':
-                    row[1] = 'OFFICE GENERAL'
-                elif ctyluc == '16':
-                    row[1] = 'RESIDENCE ON COMMERCIAL LAND'
-                elif ctyluc == '15':
-                    row[1] = 'SHOPPING CENTER'
-                elif ctyluc == '14':
-                    row[1] = 'OFFICE CONDO'
-                elif ctyluc == '13':
-                    row[1] = 'MINI-MARKETS, NO GAS'
-                elif ctyluc == '12':
-                    row[1] = 'SUBURBAN STORE'
-                elif ctyluc == '11':
-                    row[1] = 'COMMERCIAL STORE'
-                elif ctyluc == '10':
-                    row[1] = 'VACANT, SUBDIVIDED RESIDENTIAL'
-                elif ctyluc == '09':
-                    row[1] = 'MOBILE HOME IN M H PARK'
-                elif ctyluc == '08':
-                    row[1] = 'MOBILE HOME OUTSIDE OF PARK'
-                elif ctyluc == '07':
-                    row[1] = 'RESIDENTIAL, AUXILIARY IMP'
-                elif ctyluc == '06':
-                    row[1] = 'TIMESHARES'
-                elif ctyluc == '05':
-                    row[1] = 'APARTMENTS, 4 UNITS OR MORE'
-                elif ctyluc == '04':
-                    row[1] = 'SINGLE FAM RES, CONDO'
-                elif ctyluc == '03':
-                    row[1] = '3 SINGLE FAM RES, TRIPLEX'
-                elif ctyluc == '02':
-                    row[1] = '2 SINGLE FAM RES, DUPLEX'
-                elif ctyluc == '01':
-                    row[1] = 'SINGLE FAM RES, HALF PLEX'
-                elif ctyluc == '00':
-                    row[1] = 'VACANT, ALL TYPES-NOT ASGND'
-                elif ctyluc is None:
-                    row[1] == ''
-                cursor.updateRow(row)
+            
+            if ctyluc and cty == 'CC':  # Carson City
+                # Set EXISTING_LANDUSE_TRPA
+                for codes, landuse in carson_city_landuse.items():
+                    if ctyluc in codes:
+                        row[2] = landuse
+                # Set COUNTY_LANDUSE_TRPA
+                row[1] = carson_city_desc.get(ctyluc, '')
+            elif ctyluc and cty == 'WA':  # Washoe County
+                # Set EXISTING_LANDUSE_TRPA
+                for codes, landuse in washoe_landuse.items():
+                    if ctyluc in codes:
+                        row[2] = landuse
+                # Set COUNTY_LANDUSE_TRPA
+                row[1] = washoe_desc.get(ctyluc, '')
+            elif ctyluc and cty == 'DG':  # Douglas County
+                # Set EXISTING_LANDUSE_TRPA
+                for codes, landuse in douglas_landuse.items():
+                    if ctyluc in codes:
+                        row[2] = landuse
+                # Set COUNTY_LANDUSE_TRPA
+                row[1] = douglas_desc.get(ctyluc, '')
+            elif ctyluc and cty == 'PL':  # Placer County
+                # Set EXISTING_LANDUSE_TRPA
+                for codes, landuse in placer_landuse.items():
+                    if ctyluc in codes:
+                        row[2] = landuse
+                # Set COUNTY_LANDUSE_TRPA
+                row[1] = placer_desc.get(ctyluc, '')
+            elif ctyluc and cty == 'EL':  # El Dorado County
+                # Set EXISTING_LANDUSE_TRPA
+                for codes, landuse in eldo_landuse.items():
+                    if ctyluc in codes:
+                        row[2] = landuse
+                # Set COUNTY_LANDUSE_TRPA
+                row[1] = eldo_desc.get(ctyluc, '')
+            cursor.updateRow(row)
+
     # delete cursor
     del cursor
     print ("The 'EXISTING_LANDUSE' field in the parcel data has been updated")
@@ -3492,6 +3203,13 @@ try:
 
     print("Parcel_County_Staging is good to go")
     logger.info("Parcel County Staging is good to go")
+
+    #Delete the feature class from sde_tabular called Parcel_County_Staging
+    old_fc = sdeTabular + "SDE.Parcel_County_Staging"
+    arcpy.DeleteRows_management(old_fc)
+    temp_layer = arcpy.SelectLayerByAttribute_management("Parcel_County_Staging","NEW_SELECTION", "Within_TRPA_BNDY = 1")
+    arcpy.Append_management(temp_layer, old_fc, "NO_TEST")
+
     
     # report how long it took to run the script
     runTime = datetime.datetime.now() - startTimer

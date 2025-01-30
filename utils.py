@@ -94,14 +94,30 @@ def differenceDictionary(df1, df2, key_field, fields_to_ignore):
     for field in fields_to_ignore:
         df1 = df1.drop(field, axis=1)
         df2 = df2.drop(field, axis=1)
+    #for column in df2.columns:
+    #    if df1[column].dtype != df2[column].dtype:
+    #        #This handles nulls
+    #        if df1[column].dtype=='int64':
+    #            df1[column]=df1[column].astype('Int64')
+    #        df2.loc[:, column] = df2[column].astype(df1[column].dtype)
     for column in df2.columns:
         if df1[column].dtype != df2[column].dtype:
-            print(column)
-            print (df2[column].dtype)
-            #This handles nulls
-            if df1[column].dtype=='int64':
-                df1[column]=df1[column].astype('Int64')
-            df2.loc[:, column] = df2[column].astype(df1[column].dtype)
+            # Handle nulls in integer columns
+            if pd.api.types.is_integer_dtype(df1[column].dtype):
+                df1[column] = df1[column].astype('Int64')  # Nullable integer type
+            
+            # Check and clean df2 column data before casting
+            if pd.api.types.is_integer_dtype(df1[column].dtype):
+                # Convert non-numeric values to NaN
+                df2[column] = pd.to_numeric(df2[column], errors='coerce')
+            
+            try:
+                # Cast to the dtype of df1
+                df2[column] = df2[column].astype(df1[column].dtype)
+            except Exception as e:
+                print(f"Error casting column '{column}' to {df1[column].dtype}: {e}")
+
+
     #make an index from multiple fields    
     df1 = df1.set_index(key_field)
     df2 = df2.set_index(key_field)
