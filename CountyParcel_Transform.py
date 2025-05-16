@@ -1594,7 +1594,7 @@ try:
                 # Postal Zip
                 parcelzip = row[55]
                 if not (parcelzip is None):
-                    row[11] = parcelzip
+                    row[11] = parcelzip[:5]
                 else:
                     row[11] = None
                     
