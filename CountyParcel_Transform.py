@@ -1811,7 +1811,7 @@ try:
                     else:
                         logging.info("Error parsing washoe street suffix")
                 else:
-                    row[11] = ""
+                    row[6] = ""
 
                 # Postal Town
                 postal_town = row[41]
@@ -1826,7 +1826,7 @@ try:
                 # Postal Zip
                 postal_zip = row[42]
                 if not (postal_zip is None or postal_zip == '' or postal_zip.isspace()==True):
-                    row[11] = postal_zip
+                    row[11] = postal_zip[:5]
                 else:
                     row[11] = ''
                     
