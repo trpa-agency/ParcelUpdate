@@ -117,7 +117,6 @@ ParcelPoint_Tolerance       = memory + "ParcelPoint_Tolerance"
 
 #read ownership csv to get federal state etc lists
 ownership_df = pd.read_csv('ownership_lookup.csv')
-read_csv('ownership_lookup.csv')
 localOwnList = ownership_df[ownership_df['Owner_Type'] == 'Local']['Owner_Name'].tolist()
 stateOwnList = ownership_df[ownership_df['Owner_Type'] == 'State']['Owner_Name'].tolist()
 fedOwnList = ownership_df[ownership_df['Owner_Type'] == 'Federal']['Owner_Name'].tolist()
