@@ -63,7 +63,7 @@ FIRSTstartTimer = datetime.datetime.now()
 
 counties_to_run = ['El Dorado', 'Placer', 'Douglas', 'Washoe', 'Carson City']
 #counties_to_run = ['Carson City']
-
+counties_to_run = ['Placer', 'Washoe']
 # Create and open log file.
 complete_txt_path = os.path.join(workspace, "CountyParcel_Extract_Log.txt")
 print (complete_txt_path)
@@ -464,6 +464,7 @@ try:
         # Get object ids of features
         where = "1%3D1"
         urlstring = baseURL + "/query?where=1%3D1&returnIdsOnly=true&f=json&token="+token
+        print(urlstring)
         j = requests.get(urlstring, verify=True)
         js = j.json() 
         idfield = js["objectIdFieldName"]
