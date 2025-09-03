@@ -62,8 +62,7 @@ parcelAOI = "Parcel_AOI"
 FIRSTstartTimer = datetime.datetime.now()
 
 counties_to_run = ['El Dorado', 'Placer', 'Douglas', 'Washoe', 'Carson City']
-#counties_to_run = ['Carson City']
-counties_to_run = ['Placer', 'Washoe']
+
 # Create and open log file.
 complete_txt_path = os.path.join(workspace, "CountyParcel_Extract_Log.txt")
 print (complete_txt_path)
