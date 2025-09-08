@@ -115,6 +115,17 @@ ParcelPoint_Design          = memory + "ParcelPoint_Design"
 ParcelPoint_Littoral        = memory + "ParcelPoint_Littoral"
 ParcelPoint_Tolerance       = memory + "ParcelPoint_Tolerance"
 
+# Input data (feature class or shapefile)
+in_features = sde_collect_IPES
+
+where__clause_ipes = "IPESScoreType = 'Official'" 
+# Name of the new layer
+ipes_layer = "in_memory\\sde_collect_IPES_Official"
+# Make the layer
+arcpy.management.MakeFeatureLayer(in_features, ipes_layer, where__clause_ipes)
+ 
+
+
 #read ownership csv to get federal state etc lists
 ownership_df = pd.read_csv('ownership_lookup.csv')
 localOwnList = ownership_df[ownership_df['Owner_Type'] == 'Local']['Owner_Name'].tolist()
@@ -3054,7 +3065,7 @@ try:
     ### IPES Score Update --------------------------------------------------------------------------------------------###
     # transfer attributes to Parcel Layer
     fieldJoinCalc_multikey(ParcelLayer, ['APN_TRPA', 'JURISDICTION_TRPA'],['IPES_TRPA'], 
-                sde_collect_IPES, ['APN', 'JURISDICTION'],['IPESScore'])
+                ipes_layer, ['APN', 'JURISDICTION'],['IPESScore'])
     print("The 'IPES_TRPA' field in the parcel data has been updated")
 
     ### Set Status to Active--------------------------------------------------------------------------------------------------------###
