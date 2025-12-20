@@ -1,7 +1,7 @@
 """
 Script Name: Parcel_History_Update.py
 
-Purpose: Update the Parcel_History layer in the SDE databse
+Purpose: Update the Parcel_History layer in the SDE database
 required for the Parcel History layer in the GIS database.  This script will
 be run annually to update the Parcel History table with the new parcels and
 inactive parcels.  
@@ -28,7 +28,7 @@ import time
 from time import strftime
 
 #Change this year with each update
-current_year = "2024"
+current_year = "2025"
 
 #Set the constants
 subject = "Parcel History update"
@@ -53,8 +53,8 @@ Parcels_toPoint_Path = f"F:\\GIS\\PARCELUPDATE\\Workspace\\Vector.sde\\SDE.Parce
 # Define the output layers
 new_output_layer = "c:\\temp\\gis\\Workspace.gdb\\New_Parcels"
 inactive_output_layer = "c:\\temp\\gis\\Workspace.gdb\\Inactive_Parcels"
-selection_layer_new = f"c:\\temp\\gis\\Workspace.gdb\\Parcels{current_year}joinedtoHistory_TEMP"  # This has all of the parcel 2024 joined to parcel history
-selection_layer_inactive = "c:\\temp\\gis\\Workspace.gdb\\ParcelHistoryjoinedtoParcels" + current_year + "_TEMP"  # This has all of the parcel 2024 joined to parcel history
+selection_layer_new = f"c:\\temp\\gis\\Workspace.gdb\\Parcels{current_year}joinedtoHistory_TEMP"  # This has all of the parcel 2025 joined to parcel history
+selection_layer_inactive = "c:\\temp\\gis\\Workspace.gdb\\ParcelHistoryjoinedtoParcels" + current_year + "_TEMP"  # This has all of the parcel 2025 joined to parcel history
 
 # Function to remap the fields of an input layer
 def remap_fields(output_layer):
@@ -86,6 +86,7 @@ def remap_fields(output_layer):
         arcpy.AlterField_management(output_layer, "SDE_Parcel_History_b2022Active", "b2022Active", "b2022Active")
         arcpy.AlterField_management(output_layer, "SDE_Parcel_History_b2023Active", "b2023Active", "b2023Active")
         arcpy.AlterField_management(output_layer, "SDE_Parcel_History_b2024Active", "b2024Active", "b2024Active")
+        arcpy.AlterField_management(output_layer, "SDE_Parcel_History_b2025Active", "b2025Active", "b2025Active")
         arcpy.AlterField_management(output_layer, "SDE_Parcel_History_Years_Active", "Years_Active", "Years_Active")       
         # Next year add arcpy.AlterField_management(output_layer, "SDE_Parcel_History_b2025Active", "b2025Active", "b2025Active")
     
@@ -138,7 +139,7 @@ def add_missing_records(input_layer, target_layer, output_layer, join_field):
             # ToDO: Populate the PPNO field and County field
             with arcpy.da.UpdateCursor(output_layer, ["IsActive", "APN_Current", "APNS_CURRENT", "APN","STATUS", "b2006Active","b2007Active","b2008Active","b2009Active","b2010Active",
                                                     "b2011Active","b2012Active","b2013Active","b2014Active","b2015Active","b2016Active","b2017Active","b2018Active","b2019Active",
-                                                    "b2020Active","b2021Active","b2022Active","b2023Active", "Years_Active","b2024Active"
+                                                    "b2020Active","b2021Active","b2022Active","b2023Active", "Years_Active","b2024Active", "b2025Active"
                                                     ]) as cursor:
                 for row in cursor:
                     row[0] = "1"                #IsActive
@@ -163,9 +164,10 @@ def add_missing_records(input_layer, target_layer, output_layer, join_field):
                     row[20] = "0"               #2021 Active
                     row[21] = "0"               #2022 Active
                     row[22] = "0"               #2023 Active
-                    # Next year add #2025 Active and set 2024 active to 0
                     row[23] = ""                #Years Active    - Set this later in the script
-                    row[24] = "1"               #2024 Active
+                    row[24] = "0"               #2024 Active
+                    # Next year add #2026 Active and set 2025 active to 0
+                    row[25] = "1"               #2025 Active
                     cursor.updateRow(row)
 
             
@@ -174,7 +176,7 @@ def add_missing_records(input_layer, target_layer, output_layer, join_field):
             print(f"Number of records in target layer: {count}")
             fields = ["SHAPE@", "APN","IsActive", "APN_Current", "APNS_CURRENT", "APN","STATUS", "b2006Active","b2007Active","b2008Active","b2009Active","b2010Active",
                                                     "b2011Active","b2012Active","b2013Active","b2014Active","b2015Active","b2016Active","b2017Active","b2018Active","b2019Active",
-                                                    "b2020Active","b2021Active","b2022Active","b2023Active","b2024Active", "Years_Active"]
+                                                    "b2020Active","b2021Active","b2022Active","b2023Active","b2024Active", "Years_Active", "b2025Active"]
 
             values = [list(row) for row in arcpy.da.SearchCursor(output_layer, fields)]
                         
@@ -259,7 +261,7 @@ def populate_new_fields():
         # Set b2023Active to true in parcel_master if the parcel is active
         print(f"Populating Active fields")
 
-        # Create a dictionary of APNs and IsActive values from 2024 Parcels
+        # Create a dictionary of APNs and IsActive values from 2025 Parcels
         Parcel_Poly_Current = "Parcel_Poly_Current"
         arcpy.MakeFeatureLayer_management(parcel_master,Parcel_Poly_Current)
         apnDict = dict([(r[0], r[1]) for r in arcpy.da.SearchCursor(Parcel_Poly_Current, ["APN","APN"])])
@@ -298,7 +300,7 @@ def populate_new_fields():
 
 def build_years_active():
     try:
-        with arcpy.da.UpdateCursor(parcel_history, ["APN", "IsActive", "Years_Active", "Status", "b2024Active"]) as cursor:
+        with arcpy.da.UpdateCursor(parcel_history, ["APN", "IsActive", "Years_Active", "Status", "b2025Active"]) as cursor:
             for row in cursor:
                 years_active = ""
                 if str(row[1]) == "1": #Is Active
@@ -349,7 +351,7 @@ def update_current_apn():
         print ("starting check at time: "+ time.strftime("%Y-%m-%d %H:%M:%S"))
 
         #with arcpy.da.UpdateCursor(parcel_history, ["APN", "APN_Current", "APNS_CURRENT"], "IsActive = 0") as cursor:
-        with arcpy.da.UpdateCursor(parcel_history, ["APN", "APN_Current", "APNS_CURRENT", "IsActive", "Status", "b2024Active"]) as cursor:
+        with arcpy.da.UpdateCursor(parcel_history, ["APN", "APN_Current", "APNS_CURRENT", "IsActive", "Status", "b2025Active"]) as cursor:
             for row in cursor:
                 new_currentapn_string = ""
                 new_all_apns_string = ""
@@ -365,7 +367,7 @@ def update_current_apn():
                 else:
                     apn = row[0]
                     row[4] = "Inactive"     # Status
-                    row[5] = 0              # 2024 Active for inactive parcels
+                    row[5] = 0              # 2025 Active for inactive parcels
                     old_currentapn_string = str(row[1])
                     old_all_apns_string = str(row[2])
                     with arcpy.da.SearchCursor(currentapns_join, ["APN_1"], "APN = '" + apn + "'", sql_clause=(None, "ORDER BY APN_1 ASC")) as cur:
@@ -541,7 +543,7 @@ add_missing_records(input_layer, history_fc, new_output_layer, "APN")
 # Find active parcels that are now obsolete
 find_obsolete_records(input_layer, parcel_history, "APN")
 
-# Set b2024Active for all active parcels (Replace with new field each year)
+# Set b2025Active for all active parcels (Replace with new field each year)
 populate_new_fields()
 
 # Update Current APN and Current APNs for Inactive parcels

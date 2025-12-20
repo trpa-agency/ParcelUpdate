@@ -22,7 +22,7 @@ arcpy.env.workspace = inWorkspace
 # prefixes to remove...these we keep or ignore
 prefix_remove = ('880','881','910','920','500', '510', '520', '530', '560', '570', '580', '590', '600', '700','800','900')
 
-#New parcels (Parcel_County_Staging)
+#New parcels (Parcel_County_Staging) 
 parcelNew = 'parcelNew'
 arcpy.MakeFeatureLayer_management("F:\GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb/Parcel_County_Staging", parcelNew)
 

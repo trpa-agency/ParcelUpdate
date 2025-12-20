@@ -15,6 +15,8 @@ the default ArcGIS Pro python enivorment ""C:/Program Files/ArcGIS/Pro/bin/Pytho
 no need for installing new libraries.
 
 This script runs on the 16th of each month at 1am on Arc10 from scheduled task "CountyParcelExtract"
+
+
 """
 #--------------------------------------------------------------------------------------------------------#
 # import packages and modules
@@ -36,6 +38,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import pathlib
 from time import strftime
+import ssl
 
 # environment settings
 arcpy.env.workspace = "//Trpa-fs01/GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb"
@@ -44,14 +47,18 @@ arcpy.env.outputCoordinateSystem = arcpy.SpatialReference(26910)
     
 # set workspace and sde connections 
 workspace = "//Trpa-fs01/GIS/PARCELUPDATE/Workspace/Staging"
+workspace = "f:/gis/parcelupdate/workspace/staging"
 
 # network path to connection files
 filePath = "//Trpa-fs01/GIS/PARCELUPDATE/Workspace/"
+filePath = "f:/gis/parcelupdate/workspace/"
 
 # portal signin
 ## TRPA_ADMIN credentials
 portal_user = "TRPA_PORTAL_ADMIN"
-portal_pwd = str(os.environ.get('Password'))
+portal_user="admin"
+#portal_pwd = str(os.environ.get('Password'))
+portal_pwd = "WelcomeArc1"
 portal_url = "https://maps.trpa.org/portal/"
 # sign in
 arcpy.SignInToPortal(portal_url, portal_user, portal_pwd)
@@ -62,7 +69,7 @@ parcelAOI = "Parcel_AOI"
 FIRSTstartTimer = datetime.datetime.now()
 
 counties_to_run = ['El Dorado', 'Placer', 'Douglas', 'Washoe', 'Carson City']
-
+counties_to_run = ['El Dorado', 'Douglas', 'Washoe', 'Carson City']
 # Create and open log file.
 complete_txt_path = os.path.join(workspace, "CountyParcel_Extract_Log.txt")
 print (complete_txt_path)
@@ -95,7 +102,7 @@ fileToSend = complete_txt_path
 subject = "County Parcel Extract Log File"
 sender_email = "infosys@trpa.org"
 # password = ''
-receiver_email = "gis@trpa.gov"
+receiver_email = "afish@trpa.gov"
 
 # Function to check if a county exists in the list of counties to run
 def is_county_in_list(county, county_list):
@@ -142,8 +149,15 @@ try:
         baseURL = "https://portal.carson.org/arcgis/rest/services/CarsonCity/CarsonCityNV_OpenData/MapServer/36"
         fields = "*"
         urlstring = baseURL + "?f=json"
-        j = urllib.request.urlopen(urlstring)
-        js = json.load(j)
+        
+        #j = urllib.request.urlopen(urlstring)
+        #js = json.load(j)
+        # Create an unverified SSL context (skips cert validation)
+        ssl_context = ssl._create_unverified_context()
+
+        with urllib.request.urlopen(urlstring, context=ssl_context) as j:
+            js = json.load(j)
+        
         maxrc = int(js["maxRecordCount"])
         print("Carson City Feature Service record extract limit: %s" % maxrc)
         log.write("Carson City Feature Service record extract limit: %s" % maxrc)
@@ -151,8 +165,11 @@ try:
         # Get object ids of features
         where = "1=1"
         urlstring = baseURL + "/query?where={}&returnIdsOnly=true&f=json".format(where)
-        j = urllib.request.urlopen(urlstring)
-        js = json.load(j)
+        #j = urllib.request.urlopen(urlstring)
+        #js = json.load(j)
+        with urllib.request.urlopen(urlstring, context=ssl_context) as j:
+            js = json.load(j)
+
         idfield = js["objectIdFieldName"]
         idlist = js["objectIds"]
         idlist.sort()
@@ -420,7 +437,8 @@ try:
         username = 'TRPA_ADMIN'
         password = 'TRP@g1sT3am'
 
-        baseURL = "https://services9.arcgis.com/NENkjkswKTzMfG3A/arcgis/rest/services/Parcels_with_Mega/FeatureServer/0"
+        #baseURL = "https://services9.arcgis.com/NENkjkswKTzMfG3A/arcgis/rest/services/Parcels_with_Mega/FeatureServer/0"
+        baseURL = "https://services9.arcgis.com/NENkjkswKTzMfG3A/arcgis/rest/services/PARCEL_WITH_MEGA_view2/FeatureServer/0"
         fields = "*"
         outdata = 'Parcel_PL_Extracted'
         token = ''

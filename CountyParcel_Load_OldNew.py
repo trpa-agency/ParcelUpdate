@@ -54,7 +54,6 @@ filepath = "F:\GIS/PARCELUPDATE/Workspace/Parcel_Old_New/"
 parcel_list_name = "Parcel_Old_New" + strftime("%Y-%m-%d")+".csv"
 
 database_connection = 'db_connections/ConnectionFile.sde'
-#old_fc = database_connection + "\\SDE.Parcels\\SDE.Parcel_master"
 old_fc = "F:/GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb/parcel_master"
 target_table = "db_connections/ConnectionFile_Tabular.sde/Parcel_APN_NewOld"
 new_fc = "F:/GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb/Parcel_County_Staging"
@@ -69,45 +68,56 @@ inWorkspace = 'db_connections/ConnectionFile_Tabular.sde'
 arcpy.env.workspace = inWorkspace
 
 # Function to check for duplicate records
-def record_exists(target, key_fields, key_values):
-    """Checks if a record with specific key values exists in the target table."""
-    where_clause = " AND ".join([f"{field} = '{value}'" for field, value in zip(key_fields, key_values)])
-    with arcpy.da.SearchCursor(target, key_fields, where_clause) as cursor:
-        for _ in cursor:
-            return True  # Record found
-    return False  # Record not found
+# Function to check if APN+Status exists in the latest record for that APN
+def latest_record_has_status(target, apn, status):
+    """Returns True if the latest record for this APN already has this status."""
+    # Get the latest DiscoveryDate for this APN
+    where_clause = f"APN = '{apn}'"
+    fields = ['Status', 'DiscoveryDate']
+    latest_date = None
+    latest_status = None
+
+    with arcpy.da.SearchCursor(target, fields, where_clause, sql_clause=(None, "ORDER BY DiscoveryDate DESC")) as cursor:
+        for row in cursor:
+            latest_status = row[0]
+            latest_date = row[1]
+            break  # Only need the first row (latest)
+    
+    if latest_status is not None and latest_status == status:
+        return True  # Status already exists for the latest record
+    
+    return False
 
 try:
-    #arcpy.management.Append(filepath+parcel_list_name, 'Parcel_APN_NewOld', schema_type="NO_TEST")
-
-    # Define the unique key fields
-    key_fields = ['APN', 'Status', 'DiscoveryDate']
     update_fields = ['APN', 'Status', 'DiscoveryDate']
     records_to_append = []
 
-    print("Checking for duplicates in the target table...")
+    print("Checking for duplicates in the target table based on latest record...")
+
     for _, row in df_parcel_changes.iterrows():
         # Skip records with empty or null APN
         if not row['APN'] or pd.isna(row['APN']):
             print("Skipping record with empty or null APN.")
             continue
-        # Extract key values from the current row
-        key_values = [row[field] for field in key_fields]
-        # Check if the record already exists in the target table
-        if not record_exists(target_table, key_fields, key_values):
-            records_to_append.append(key_values)
+        
+        apn = row['APN']
+        status = row['Status']
+        discovery_date = row['DiscoveryDate']
+
+        if not latest_record_has_status(target_table, apn, status):
+            records_to_append.append([apn, status, discovery_date])
         else:
-            print(f"Record {dict(zip(key_fields, key_values))} already exists. Skipping.")
-    
+            print(f"Latest record for APN {apn} already has Status '{status}'. Skipping.")
+
     if records_to_append:
         print(f"Appending {len(records_to_append)} new records to the target table...")
         with arcpy.da.InsertCursor(target_table, update_fields) as insert_cursor:
             for record in records_to_append:
-                #print(f"Inserting record {dict(zip(update_fields, record))}")
                 insert_cursor.insertRow(record)
         print("Records successfully appended.")
     else:
-        print("No new records to append.")    
+        print("No new records to append.")
+
 except Exception:
     e = sys.exc_info()[1]
     print(e.args[0])

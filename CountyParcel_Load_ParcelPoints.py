@@ -9,13 +9,13 @@ import utils
 arcpy.env.overwriteOutput = True
 arcpy.env.outputCoordinateSystem = arcpy.SpatialReference(26910)
 
-#Create database connection
+#Create database connection 
 inWorkspace = "F:\GIS\PARCELUPDATE\Workspace\Vector.sde"
 arcpy.env.workspace = inWorkspace
 
 # Specify the name of the new version and the parent version
 new_version_name = "Parcel_Point_Update_" + strftime("%Y-%m-%d")
-new_version_name = "Parcel_Update_2025-09-05"
+new_version_name = "Parcel_Update_2025-12-05"
 parent_version = "SDE.DEFAULT"
 version_name_full = "SDE." + new_version_name
 version_list = arcpy.da.ListVersions(inWorkspace)

@@ -34,7 +34,7 @@ df_special_parcels = pd.read_excel("F:\GIS/PARCELUPDATE/Workspace/special_parcel
 
 # Specify the name of the new version and the parent version
 new_version_name = "Parcel_Update_" + strftime("%Y-%m-%d")
-new_version_name = "Parcel_Update_2025-09-05"
+new_version_name = "Parcel_Update_2025-12-05"
 parent_version = "SDE.DEFAULT"
 version_name_full = "SDE." + new_version_name
 version_list = arcpy.da.ListVersions(inWorkspace)
