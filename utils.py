@@ -357,8 +357,16 @@ def generate_spatial_dataframe(feature_class, data_type_mapping, fields_to_exclu
 
     # Create a pandas DataFrame from the dictionary
     df = pd.DataFrame(data)
+    # Cast columns to their intended types after construction
+    for field_name, arcpy_type in field_data_types.items():
+        if arcpy_type in ("Integer", "SmallInteger"):
+            # use nullable integer to handle any None/NaN values
+            df[field_name] = df[field_name].astype("Int64")
+        elif arcpy_type in ("Single", "Double"):
+            df[field_name] = df[field_name].astype("float64")
 
     return df
+
 
 def get_text_fields(feature_class):
     field_list = []

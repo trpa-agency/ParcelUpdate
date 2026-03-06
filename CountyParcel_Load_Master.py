@@ -75,9 +75,13 @@ master_fc_path = r'SDE.Parcels\SDE.Parcel_Master'
 fields_to_exclude_master = ['SHAPE','OBJECTID', 'Shape']
 
 
-fields_to_ignore_master = ['PARCEL_SQFT', 'PPNO', 'ESTIMATED_COVERAGE_ALLOWED', 'IMPERVIOUS_SURFACE_SQFT', 
-                    'LOCATION_TO_TOWNCENTER', 'UNITS', 'PARCEL_ACRES','YEAR_BUILT', 'BEDROOMS',
-                   'BUILDING_SQFT', 'BATHROOMS']
+#fields_to_ignore_master = ['PARCEL_SQFT', 'PPNO', 'ESTIMATED_COVERAGE_ALLOWED', 'IMPERVIOUS_SURFACE_SQFT', 
+#                    'LOCATION_TO_TOWNCENTER', 'UNITS', 'PARCEL_ACRES','YEAR_BUILT', 'BEDROOMS',
+#                   'BUILDING_SQFT', 'BATHROOMS']
+
+fields_to_ignore_master = ['PARCEL_SQFT', 'ESTIMATED_COVERAGE_ALLOWED', 'IMPERVIOUS_SURFACE_SQFT', 
+                    'LOCATION_TO_TOWNCENTER', 'PARCEL_ACRES',
+                   'BUILDING_SQFT', 'BATHROOMS', 'UNITS', 'BEDROOMS']
 
 master_difference_csv = "Differences_List.csv"
 database_connection = 'db_connections/ConnectionFile.sde'
@@ -90,6 +94,7 @@ data_type_mapping = {
     "Double": float,
     "Date": pd.to_datetime
 }
+
 
 #Update parcel master
 utils.update_parcel_layer(parcelNew, master_fc_path,prefix_remove, data_type_mapping, fields_to_exclude_master, fields_to_ignore_master,

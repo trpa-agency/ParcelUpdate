@@ -248,13 +248,13 @@ counties_to_run = ['El Dorado', 'Placer', 'Douglas', 'Washoe', 'Carson City']
 ##--------------------------------------------------------------------------------------------------------#
 ## SETUP SEND EMAIL WITH LOG FILE ##
 ##--------------------------------------------------------------------------------------------------------#
-# path to text file
+# path to text fil      e
 fileToSend = log_file_path
 # email parameters
 subject = "Parcel Transformation Log File"
 sender_email = "infosys@trpa.org"
 # password = ''
-receiver_email = "afish@trpa.gov"
+receiver_email = "gis@trpa.gov"
 #----------------------------------------------------------------------
 # FUNCTIONS
 #----------------------------------------------------------------------
@@ -827,6 +827,7 @@ try:
                 year_built = row[50]
                 if not (year_built is None or year_built==''):
                     row[26] = year_built
+                    #row[26] = int(year_built)
                 else:
                     row[26] = None
                 
@@ -1301,6 +1302,7 @@ try:
                 year_built = row[49]
                 if not (year_built is None):
                     row[26] = year_built
+                    #row[26] = int(year_built)
                 else:
                     row[26] = None
                     
@@ -1597,7 +1599,8 @@ try:
                 # Year Built
                 year_built = row[53]
                 if not (year_built is None):
-                    row[28] = year_built
+                    #row[28] = year_built
+                    row[28] = int(year_built)
                 else:
                     row[28] = None
                     
@@ -1959,6 +1962,7 @@ try:
                 year_built = row[59]
                 if not (year_built is None or year_built==''):
                     row[28] = year_built
+                    #row[28] = int(year_built)
                 else:
                     row[28] = None
                     
