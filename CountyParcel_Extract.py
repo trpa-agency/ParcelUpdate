@@ -69,7 +69,7 @@ parcelAOI = "Parcel_AOI"
 FIRSTstartTimer = datetime.datetime.now()
 
 counties_to_run = ['El Dorado', 'Placer', 'Douglas', 'Washoe', 'Carson City']
-counties_to_run = ['El Dorado', 'Douglas', 'Washoe', 'Carson City']
+# counties_to_run = ['El Dorado', 'Douglas', 'Washoe', 'Carson City']
 # Create and open log file.
 complete_txt_path = os.path.join(workspace, "CountyParcel_Extract_Log.txt")
 print (complete_txt_path)
@@ -102,7 +102,7 @@ fileToSend = complete_txt_path
 subject = "County Parcel Extract Log File"
 sender_email = "infosys@trpa.org"
 # password = ''
-receiver_email = "afish@trpa.gov"
+receiver_email = "gis@trpa.gov"
 
 # Function to check if a county exists in the list of counties to run
 def is_county_in_list(county, county_list):
