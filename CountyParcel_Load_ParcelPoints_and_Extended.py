@@ -15,7 +15,7 @@ arcpy.env.workspace = inWorkspace
 
 # Specify the name of the new version and the parent version
 new_version_name = "Parcel_Point_Update_" + strftime("%Y-%m-%d")
-new_version_name = "Parcel_Update_2026-02-23"
+new_version_name = "Parcel_Update_2026-04-20"
 parent_version = "SDE.DEFAULT"
 version_name_full = "SDE." + new_version_name
 version_list = arcpy.da.ListVersions(inWorkspace)

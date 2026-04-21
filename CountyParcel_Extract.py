@@ -69,7 +69,8 @@ parcelAOI = "Parcel_AOI"
 FIRSTstartTimer = datetime.datetime.now()
 
 counties_to_run = ['El Dorado', 'Placer', 'Douglas', 'Washoe', 'Carson City']
-# counties_to_run = ['El Dorado', 'Douglas', 'Washoe', 'Carson City']
+#counties_to_run = ['El Dorado', 'Douglas', 'Washoe', 'Carson City']
+# counties_to_run = ['Placer']
 # Create and open log file.
 complete_txt_path = os.path.join(workspace, "CountyParcel_Extract_Log.txt")
 print (complete_txt_path)
@@ -438,7 +439,8 @@ try:
         password = 'TRP@g1sT3am'
 
         #baseURL = "https://services9.arcgis.com/NENkjkswKTzMfG3A/arcgis/rest/services/Parcels_with_Mega/FeatureServer/0"
-        baseURL = "https://services9.arcgis.com/NENkjkswKTzMfG3A/arcgis/rest/services/PARCEL_WITH_MEGA_view2/FeatureServer/0"
+        #baseURL = "https://services9.arcgis.com/NENkjkswKTzMfG3A/arcgis/rest/services/PARCEL_WITH_MEGA_view2/FeatureServer/0"
+        baseURL = "https://services9.arcgis.com/NENkjkswKTzMfG3A/arcgis/rest/services/County_Parcels/FeatureServer/0"
         fields = "*"
         outdata = 'Parcel_PL_Extracted'
         token = ''
