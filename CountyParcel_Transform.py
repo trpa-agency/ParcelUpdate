@@ -254,7 +254,7 @@ fileToSend = log_file_path
 subject = "Parcel Transformation Log File"
 sender_email = "infosys@trpa.org"
 # password = ''
-receiver_email = "gis@trpa.gov"
+receiver_email = "afish@trpa.gov"
 #----------------------------------------------------------------------
 # FUNCTIONS
 #----------------------------------------------------------------------
@@ -1411,7 +1411,7 @@ try:
                                                 'LANDVALUE',# land value      #51
                                                 'STRUCTURE',# improved value  #52
                                                 'EffectiveYr',# year built     #53
-                                                'StructureSF',  # build sqft      #54
+                                                'Tot_Str_Sqft',  # build sqft      #54   - Changed 4/20/26. Was StructureSF
                                                 'SitusZip'      # Parcel zip      #55
                                             
         ]) as cursor:   
