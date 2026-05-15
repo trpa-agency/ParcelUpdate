@@ -3,7 +3,7 @@ ParcelTables_to_ParcelFeatures.py
 Created: April 24th, 2026
 Amy Fish, Tahoe Regional Planning Agency
 
-This python script updates the BMP Database based on parcel_county_staging
+This python script updates the BMP Database based on parcel_master
 Converted from VB.NET by: Claude
 """
 import os
@@ -34,10 +34,19 @@ BMP_DB = {
     "driver":   "ODBC+Driver+17+for+SQL+Server",
 }
 
-# Staging database  (Data Source=sql12; Initial Catalog=sde_tabular)
-STAGING_DB = {
+# Staging tabular database  (Data Source=sql12; Initial Catalog=sde_tabular)
+STAGING_TABULAR_DB = {
     "host":     "sql12",
     "database": "sde_tabular",
+    "username": "sde",
+    "password": "",
+    "driver":   "ODBC+Driver+17+for+SQL+Server",
+}
+
+# Staging SDE database  (Data Source=sql12; Initial Catalog=sde)
+STAGING_SDE_DB = {
+    "host":     "sql12",
+    "database": "sde",
     "username": "sde",
     "password": "",
     "driver":   "ODBC+Driver+17+for+SQL+Server",
@@ -54,9 +63,11 @@ def build_connection_string(cfg: dict) -> str:
 
 
 BMP_CONNECTION_STRING     = build_connection_string(BMP_DB)
-STAGING_CONNECTION_STRING = build_connection_string(STAGING_DB)
+STAGING_TABULAR_CONNECTION_STRING = build_connection_string(STAGING_TABULAR_DB)
+STAGING_SDE_CONNECTION_STRING = build_connection_string(STAGING_SDE_DB)
 
 VALIDATE_ONLY: bool = False          # Set True to preview changes without writing
+
 LOG_DIR: str = r"C:\temp"           # Directory for output log files
 EMAIL_FROM: str = "infosys@trpa.org"
 EMAIL_TO: str = "afish@trpa.gov"
@@ -90,9 +101,15 @@ def get_bmp_session():
     return sessionmaker(bind=engine)()
 
 
-def get_staging_session():
-    """Session for the staging database (sql12/sde_tabular) — read only."""
-    engine = create_engine(STAGING_CONNECTION_STRING, fast_executemany=True)
+def get_staging_tabular_session():
+    """Session for the staging tabular database (sql12/sde_tabular) — read only."""
+    engine = create_engine(STAGING_TABULAR_CONNECTION_STRING, fast_executemany=True)
+    return sessionmaker(bind=engine)()
+
+
+def get_staging_sde_session():
+    """Session for the staging SDE database (sql12/sde) — read only."""
+    engine = create_engine(STAGING_SDE_CONNECTION_STRING, fast_executemany=True)
     return sessionmaker(bind=engine)()
 
 
@@ -223,14 +240,15 @@ def send_email(subject: str, body: str, to_addr: str):
 
 def main():
     bmp = get_bmp_session()
-    staging = get_staging_session()
+    staging_tabular = get_staging_tabular_session()
+    staging_sde = get_staging_sde_session()
     try:
-        update_bmp_land_use(bmp, staging, VALIDATE_ONLY)
-        update_bmp_attributes(bmp, staging, VALIDATE_ONLY)
-        update_addresses_bmp(bmp, staging, VALIDATE_ONLY)
-        update_owners_bmp(bmp, staging, VALIDATE_ONLY)
-        set_bmp_parcels_inactive(bmp, staging, VALIDATE_ONLY)
-        new_parcels_bmp(bmp, staging, VALIDATE_ONLY)
+        update_bmp_land_use(bmp, staging_sde, VALIDATE_ONLY)
+        update_bmp_attributes(bmp, staging_sde, VALIDATE_ONLY)
+        update_addresses_bmp(bmp, staging_sde, VALIDATE_ONLY)
+        update_owners_bmp(bmp, staging_sde, VALIDATE_ONLY)
+        set_bmp_parcels_inactive(bmp, staging_tabular, VALIDATE_ONLY)
+        new_parcels_bmp(bmp, staging_sde, VALIDATE_ONLY)
         bmp.commit()
         log.info("All updates complete.")
     except Exception as ex:
@@ -238,7 +256,8 @@ def main():
         handle_error(ex)
     finally:
         bmp.close()
-        staging.close()
+        staging_tabular.close()
+        staging_sde.close()
 
 
 # ---------------------------------------------------------------------------
@@ -308,9 +327,9 @@ def update_bmp_land_use(bmp_session, staging_session, validate_only: bool):
             staging_session,
             """
             SELECT APN, JURISDICTION, EXISTING_LANDUSE,
-                   REGIONAL_LANDUSE, COUNTY_LANDUSE
-            FROM   sde_tabular.sde.parcel_county_staging
-            WHERE  Within_TRPA_BNDY = 1
+                   REGIONAL_LANDUSE, COUNTY_LANDUSE_Description
+            FROM   parcel_master
+            
             """,
         )
         bmp_rows = fetch_all(
@@ -328,7 +347,7 @@ def update_bmp_land_use(bmp_session, staging_session, validate_only: bool):
             jurisdiction = str(row["JURISDICTION"])
             apo_land_use = str(row["EXISTING_LANDUSE"])
             apo_gen_use = str(row["REGIONAL_LANDUSE"])
-            apo_county_luc = str(row["COUNTY_LANDUSE"])
+            apo_county_luc = str(row["COUNTY_LANDUSE_Description"])
 
             if apo_gen_use == "Resort Recreation":
                 apo_gen_use = "Recreation"
@@ -405,8 +424,7 @@ def update_bmp_attributes(bmp_session, staging_session, validate_only: bool):
             """
             SELECT APN, JURISDICTION, SOIL_2003,
                    WATERSHED_NUMBER, FIREPD
-            FROM   Parcel_county_staging
-            WHERE  Within_TRPA_BNDY = 1
+            FROM   Parcel_master
             """,
         )
         bmp_rows = fetch_all(
@@ -468,7 +486,7 @@ def update_bmp_attributes(bmp_session, staging_session, validate_only: bool):
                     pass
 
             # Fire district
-            if firepd_bmp != firepd and firepd:
+            if firepd_bmp != firepd and firepd and firepd.upper() not in ('NONE', 'NULL', ''):
                 action = "Insert" if not firepd_bmp else "Updated"
                 lines.append(f"{apn}: {action} Fire PD from {firepd_bmp} to {firepd}")
                 if not validate_only:
@@ -533,7 +551,7 @@ def update_addresses_bmp(bmp_session, staging_session, validate_only: bool):
     try:
         staging = fetch_all(
             staging_session,
-            "SELECT APN, JURISDICTION, APO_ADDRESS, PSTL_TOWN, PSTL_ZIP5 FROM Parcel_county_staging WHERE Within_TRPA_BNDY = 1",
+            "SELECT APN, JURISDICTION, APO_ADDRESS, PSTL_TOWN, PSTL_ZIP5 FROM parcel_master",
         )
         bmp_rows = fetch_all(
             bmp_session,
@@ -637,8 +655,7 @@ def update_owners_bmp(bmp_session, staging_session, validate_only: bool):
             """
             SELECT APN, JURISDICTION, OWN_FULL,
                    MAIL_ADD1, MAIL_CITY, MAIL_STATE, MAIL_ZIP5
-            FROM   Parcel_county_staging
-            WHERE  Within_TRPA_BNDY = 1
+            FROM   Parcel_master
             """,
         )
         bmp_rows = fetch_all(
@@ -793,8 +810,7 @@ def new_parcels_bmp(bmp_session, staging_session, validate_only: bool):
                    MAIL_ADD1, MAIL_CITY, MAIL_STATE, MAIL_ZIP5,
                    PSTL_TOWN, PSTL_ZIP5,
                    STR_DIR, STR_NAME, STR_SUFFIX, HSE_NUMBR, UNIT_NUMBR
-            FROM   Parcel_county_staging
-            WHERE  Within_TRPA_BNDY = 1
+            FROM   Parcel_master
             """,
         )
         bmp_rows = fetch_all(
