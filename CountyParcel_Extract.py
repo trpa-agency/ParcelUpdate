@@ -22,6 +22,7 @@ This script runs on the 16th of each month at 1am on Arc10 from scheduled task "
 # import packages and modules
 # import packages
 import urllib
+import urllib.parse
 import json
 import requests
 import os
@@ -39,6 +40,8 @@ from email.mime.multipart import MIMEMultipart
 import pathlib
 from time import strftime
 import ssl
+import traceback
+import linecache
 
 # environment settings
 arcpy.env.workspace = "//Trpa-fs01/GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb"
@@ -69,8 +72,7 @@ parcelAOI = "Parcel_AOI"
 FIRSTstartTimer = datetime.datetime.now()
 
 counties_to_run = ['El Dorado', 'Placer', 'Douglas', 'Washoe', 'Carson City']
-#counties_to_run = ['El Dorado', 'Douglas', 'Washoe', 'Carson City']
-# counties_to_run = ['Placer']
+
 # Create and open log file.
 complete_txt_path = os.path.join(workspace, "CountyParcel_Extract_Log.txt")
 print (complete_txt_path)
@@ -147,7 +149,7 @@ try:
         print("Deleted existing Carson City County Feature Class")
         log.write("Deleted existing Carson City County Feature Class")
 
-        baseURL = "https://portal.carson.org/arcgis/rest/services/CarsonCity/CarsonCityNV_OpenData/MapServer/36"
+        baseURL = "https://portal.carsoncity.gov/server/rest/services/CarsonCity/CarsonCityNV_OpenData/MapServer/36"
         fields = "*"
         urlstring = baseURL + "?f=json"
         
@@ -203,7 +205,7 @@ try:
         arcpy.Merge_management(fslist, 'Parcel_CC_Features')
 
         #The associated attributes in the table
-        baseURL = "https://portal.carson.org/arcgis/rest/services/CarsonCity/CarsonCityNV_OpenData/MapServer/42"
+        baseURL = "https://portal.carsoncity.gov/server/rest/services/CarsonCity/CarsonCityNV_OpenData/MapServer/42"
         fields = "*"
         urlstring = baseURL + "?f=json"
         j = urllib.request.urlopen(urlstring)
@@ -334,10 +336,27 @@ try:
         fslist = []
         for key,value in fs.items():
             fslist.append(value)
-        arcpy.Merge_management(fslist, outfc)
-
-        print("Douglas Parcels Extracted")
-        log.write("Douglas Parcels Extracted")
+        
+        if len(fslist) == 0:
+            print("ERROR: No feature sets collected for Douglas")
+            log.write("ERROR: No feature sets collected for Douglas\n")
+        else:
+            print(f"Merging {len(fslist)} feature sets...")
+            log.write(f"Merging {len(fslist)} feature sets...\n")
+            try:
+                arcpy.Merge_management(fslist, outfc)
+                
+                # Verify the output was created
+                if arcpy.Exists(outfc):
+                    count = int(arcpy.management.GetCount(outfc)[0])
+                    print(f"Douglas Parcels Extracted: {count} features")
+                    log.write(f"Douglas Parcels Extracted: {count} features\n")
+                else:
+                    print("ERROR: Merge completed but output feature class does not exist")
+                    log.write("ERROR: Merge completed but output feature class does not exist\n")
+            except Exception as e:
+                print(f"ERROR during Douglas merge: {str(e)}")
+                log.write(f"ERROR during Douglas merge: {str(e)}\n")
 
     #---------------------------------------------------------------------------------------#
     # EL DORADO EXTRACT
@@ -346,10 +365,19 @@ try:
     exists = is_county_in_list(county_to_check, counties_to_run)
     print(f"Is {county_to_check} in the list? {exists}")
     if exists == 1:    
+        # Set up output feature class
+        outfc = "Parcel_EL_Extracted"
+
+        # Delete existing output feature class if it exists
+        try:
+            arcpy.management.Delete(outfc)
+            print("Deleted existing El Dorado County Feature Class")
+            log.write("Deleted existing El Dorado County Feature Class\n")
+        except:
+            pass
+        
         # Set up Zip path.
         zipPath = workspace
-        # setup output feature class
-        outfc = "Parcel_EL_Extracted"
 
         # Check if zip from failed attempt still exists
         existingZip = pathlib.Path(zipPath + r"\zipfolder")
@@ -417,9 +445,13 @@ try:
         # Setup env for parcel FGDB and set overwrite to true.
         zipFolder = zipPath + r"\zipfolder"
         # arcpy.env.overwriteOutput = True
-        in_features = os.path.join(workspace, "zipfolder\data.gdb\Parcels")
+        in_features = os.path.join(workspace, "zipfolder", "data.gdb", "Parcels")
 
         # Export to staging gdb
+
+        if not arcpy.Exists(in_features):
+            raise FileNotFoundError(f"Input feature class not found: {in_features}")
+
         arcpy.management.CopyFeatures(in_features, outfc)
         print("El Dorado Parcels Extracted")
 
@@ -438,9 +470,8 @@ try:
         username = 'TRPA_ADMIN'
         password = 'TRP@g1sT3am'
 
-        #baseURL = "https://services9.arcgis.com/NENkjkswKTzMfG3A/arcgis/rest/services/Parcels_with_Mega/FeatureServer/0"
-        #baseURL = "https://services9.arcgis.com/NENkjkswKTzMfG3A/arcgis/rest/services/PARCEL_WITH_MEGA_view2/FeatureServer/0"
         baseURL = "https://services9.arcgis.com/NENkjkswKTzMfG3A/arcgis/rest/services/County_Parcels/FeatureServer/0"
+
         fields = "*"
         outdata = 'Parcel_PL_Extracted'
         token = ''
@@ -471,21 +502,48 @@ try:
         else:
             token = ''
 
-        print('Token: '+token)
+        print('Token: ' + token)
+
+        def get_agol_token():
+            try:
+                tokenURL = 'https://www.arcgis.com/sharing/rest/generateToken'
+                params = {
+                    'f': 'pjson',
+                    'username': username,
+                    'password': password,
+                    'referer': 'https://www.arcgis.com',
+                    'expiration': str(21600)
+                }
+                response = requests.post(tokenURL, data=params, verify=False)
+                response.raise_for_status()
+                js = response.json()
+                if 'token' not in js:
+                    raise ValueError(f"Unable to generate token: {js}")
+                return js['token']
+            except Exception:
+                PrintException()
+
+        def build_query_url(where_clause, current_token):
+            where_encoded = urllib.parse.quote(where_clause, safe='')
+            token_encoded = urllib.parse.quote(current_token, safe='')
+            fields_encoded = urllib.parse.quote(fields, safe='*')
+            return baseURL + f'/query?where={where_encoded}&returnGeometry=true&outFields={fields_encoded}&f=json&token=' + token_encoded
+
+        token = get_agol_token()
+        token_expire = time.time() + 21000
 
         # Get record extract limit 
-        urlstring = baseURL + "?token="+token+"&f=json" 
+        urlstring = baseURL + "?token=" + urllib.parse.quote(token, safe='') + "&f=json"
         j = requests.get(urlstring, verify=False)
-        js = j.json() 
-        maxrc = int(js["maxRecordCount"]) 
+        js = j.json()
+        maxrc = int(js["maxRecordCount"])
         print("Record extract limit: %s" % maxrc)
 
         # Get object ids of features
-        where = "1%3D1"
-        urlstring = baseURL + "/query?where=1%3D1&returnIdsOnly=true&f=json&token="+token
+        urlstring = baseURL + "/query?where=1%3D1&returnIdsOnly=true&f=json&token=" + urllib.parse.quote(token, safe='')
         print(urlstring)
-        j = requests.get(urlstring, verify=True)
-        js = j.json() 
+        j = requests.get(urlstring, verify=False)
+        js = j.json()
         idfield = js["objectIdFieldName"]
         idlist = js["objectIds"]
         idlist.sort()
@@ -493,26 +551,56 @@ try:
         print("Number of target records: %s" % numrec)
 
         # Gather features
-        print ("Gathering records...")
-        fs = {}
+        print("Gathering records...")
+        batch_features = []
         for i in range(0, numrec, maxrc):
+            if time.time() >= token_expire:
+                token = get_agol_token()
+                token_expire = time.time() + 21000
+
             torec = i + (maxrc - 1)
             if torec > numrec:
                 torec = numrec - 1
             fromid = idlist[i]
             toid = idlist[torec]
             where = "{} >= {} and {} <= {}".format(idfield, fromid, idfield, toid)
-            print ("  {}".format(where))
-            urlstring = baseURL + f'/query?where={where}&returnGeometry=true&outFields={fields}&f=json&token='+token
-            fs[i] = arcpy.FeatureSet()
-            fs[i].load(urlstring)
+            print("  {}".format(where))
+            urlstring = build_query_url(where, token)
 
-        # Save features
+            response = requests.get(urlstring, verify=False)
+            response.raise_for_status()
+            js = response.json()
+            if 'error' in js:
+                error_text = json.dumps(js['error'])
+                if 'token' in error_text.lower():
+                    token = get_agol_token()
+                    token_expire = time.time() + 21000
+                    urlstring = build_query_url(where, token)
+                    response = requests.get(urlstring, verify=False)
+                    response.raise_for_status()
+                    js = response.json()
+                else:
+                    raise ValueError(f"Placer query error: {js}")
+
+            if 'features' not in js:
+                raise ValueError(f"Unexpected Placer query response: {js}")
+
+            temp_json = os.path.join(workspace, f"Parcel_PL_batch_{i}.json")
+            with open(temp_json, 'w', encoding='utf-8') as temp_file:
+                json.dump(js, temp_file)
+
+            temp_fc = os.path.join('in_memory', f'Parcel_PL_batch_{i}')
+            arcpy.JSONToFeatures_conversion(temp_json, temp_fc)
+            batch_features.append(temp_fc)
+            os.remove(temp_json)
+
         print("Saving features...")
-        fslist = []
-        for key,value in fs.items():
-            fslist.append(value)
-        arcpy.Merge_management(fslist, outdata)
+        if arcpy.Exists(outdata):
+            arcpy.management.Delete(outdata)
+        arcpy.Merge_management(batch_features, outdata)
+        for temp_fc in batch_features:
+            if arcpy.Exists(temp_fc):
+                arcpy.management.Delete(temp_fc)
         print("Done Saving Placer Features")
 
     #---------------------------------------------------------------------------------------#
@@ -586,24 +674,31 @@ try:
     parcelDelete = "ParcelDelete"
 
     for parcel in parcelLayers:
+        # Skip layers that weren't created during the extract
+        if not arcpy.Exists(parcel):
+            print(f"Skipping {parcel} - does not exist")
+            log.write(f"Skipping {parcel} - does not exist\n")
+            continue
+
         # Run MakeFeatureLayer
         arcpy.management.MakeFeatureLayer(parcel, parcelDelete)
-        # select within clementini 
-        arcpy.management.SelectLayerByLocation(parcelDelete, 
-                                            "INTERSECT", 
-                                            # includes TRPA Boundary and Olympic Valley Wateshed
-                                            parcelAOI, '0', 
-                                            "NEW_SELECTION", "INVERT")
+        # select within clementini
+        arcpy.management.SelectLayerByLocation(parcelDelete,
+                                              "INTERSECT",
+                                              # includes TRPA Boundary and Olympic Valley Wateshed
+                                              parcelAOI, '0',
+                                              "NEW_SELECTION", "INVERT")
 
-        # Run GetCount and if some features have been selected, then 
-        #  run DeleteFeatures to remove the selected features.
-        deleteCount=arcpy.management.GetCount(parcelDelete)[0]
-        if int(deleteCount) > 0:
+        # Run GetCount and if some features have been selected, then
+        # run DeleteFeatures to remove the selected features.
+        deleteCount = int(arcpy.management.GetCount(parcelDelete)[0])
+        if deleteCount > 0:
             arcpy.management.DeleteFeatures(parcelDelete)
+
         # delete feature layer
         arcpy.management.Delete(parcelDelete)
-        print("{} features deleted".format(deleteCount))
-        log.write("{} features deleted".format(deleteCount))
+        print(f"{deleteCount} features deleted from {parcel}")
+        log.write(f"{deleteCount} features deleted from {parcel}\n")
     ##--------------------------------------------------------------------------------------------------------#
     ## Send Email with Log ##
     ##--------------------------------------------------------------------------------------------------------#
@@ -622,23 +717,41 @@ try:
 
 # catch any arcpy errors
 except arcpy.ExecuteError:
-    print(arcpy.GetMessages())
-    log.write(arcpy.GetMessages())
+    import traceback
+    exc_type, exc_obj, tb = sys.exc_info()
+    f = tb.tb_frame
+    lineno = tb.tb_lineno
+    filename = f.f_code.co_filename
+    line_content = linecache.getline(filename, lineno, f.f_globals).strip()
+    
+    error_msg = f"\n{'='*80}\nARCPY ERROR on Line {lineno}:\n{line_content}\n{'='*80}\n{traceback.format_exc()}\n{arcpy.GetMessages()}"
+    print(error_msg)
+    log.write(error_msg)
     log.close()
     
     header = "ERROR - Arcpy Exception - Check Log"
-    # send email with header based on try/except result
-    send_mail(header)
-    print('Sending email...')
+    try:
+        send_mail(header)
+        print('Sending error email...')
+    except Exception as mail_error:
+        print(f"Failed to send email: {mail_error}")
 
 # catch system errors
-except Exception:
-    e = sys.exc_info()[1]
-    print(e.args[0])
-    log.write(str(e.args[0]))
+except Exception as e:
+    exc_type, exc_obj, tb = sys.exc_info()
+    f = tb.tb_frame
+    lineno = tb.tb_lineno
+    filename = f.f_code.co_filename
+    line_content = linecache.getline(filename, lineno, f.f_globals).strip()
+    
+    error_msg = f"\n{'='*80}\nSYSTEM ERROR on Line {lineno}:\n{line_content}\n{'='*80}\n{traceback.format_exc()}"
+    print(error_msg)
+    log.write(error_msg)
     log.close()
     
     header = "ERROR - System Error - Check Log"
-    # send email with header based on try/except result
-    send_mail(header)
-    print('Sending email...')
+    try:
+        send_mail(header)
+        print('Sending error email...')
+    except Exception as mail_error:
+        print(f"Failed to send email: {mail_error}")

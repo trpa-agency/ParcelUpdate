@@ -81,62 +81,78 @@ def fieldJoinCalc_multikey(updateFC, updateFieldsList_key, updateFieldsList_valu
 #Gonna have to make this a compound key as well - need to handle duplicate APNs?
 @timer
 def differenceDictionary(df1, df2, key_field, fields_to_ignore):
-    #Generate a list of columns in common
+    # Generate a list of columns in common
     common_columns = list(set(df1.columns) & set(df2.columns))
-    # keep only the common columns in both dataframes
+    if not common_columns:
+        return {}
+
+    # Keep only the common columns in both dataframes
+    df1 = df1[common_columns].copy()
+    df2 = df2[common_columns].copy()
+
+    # Trim spaces
+    for df in (df1, df2):
+        for column in df.columns:
+            df[column] = df[column].apply(lambda x: x.strip() if isinstance(x, str) else x)
+
+    # Force the column types to match while preserving the key field
+    drop_fields = [field for field in fields_to_ignore if field != key_field]
+    for field in drop_fields:
+        try:
+            df1 = df1.drop(field, axis=1, errors='ignore')
+            df2 = df2.drop(field, axis=1, errors='ignore')
+        except Exception as e:
+            print(f"Warning: Could not drop field '{field}': {e}")
+
+    # Recalculate common columns after drops
+    common_columns = sorted(list(set(df1.columns) & set(df2.columns)))
     df1 = df1[common_columns]
     df2 = df2[common_columns]
-    #Trim spaces
-    df1 = df1.applymap(lambda x: x.strip() if isinstance(x, str) else x)
-    df2 = df2.applymap(lambda x: x.strip() if isinstance(x, str) else x)
-    
-    #Force the column types to match
-    for field in fields_to_ignore:
-        df1 = df1.drop(field, axis=1)
-        df2 = df2.drop(field, axis=1)
-    #for column in df2.columns:
-    #    if df1[column].dtype != df2[column].dtype:
-    #        #This handles nulls
-    #        if df1[column].dtype=='int64':
-    #            df1[column]=df1[column].astype('Int64')
-    #        df2.loc[:, column] = df2[column].astype(df1[column].dtype)
+
+    # Force the column types to match
     for column in df2.columns:
+        if column not in df1.columns:
+            continue
         if df1[column].dtype != df2[column].dtype:
-            # Handle nulls in integer columns
             if pd.api.types.is_integer_dtype(df1[column].dtype):
-                df1[column] = df1[column].astype('Int64')  # Nullable integer type
-            
-            # Check and clean df2 column data before casting
+                df1[column] = df1[column].astype('Int64')
             if pd.api.types.is_integer_dtype(df1[column].dtype):
-                # Convert non-numeric values to NaN
                 df2[column] = pd.to_numeric(df2[column], errors='coerce')
-            
             try:
-                # Cast to the dtype of df1
                 df2[column] = df2[column].astype(df1[column].dtype)
             except Exception as e:
                 print(f"Error casting column '{column}' to {df1[column].dtype}: {e}")
 
+    # Make an index from the key field and align both frames to the union of labels
+    if key_field not in df1.columns or key_field not in df2.columns:
+        raise KeyError(f"Key field '{key_field}' is not present in both dataframes")
 
-    #make an index from multiple fields    
     df1 = df1.set_index(key_field)
     df2 = df2.set_index(key_field)
     df1.sort_index(inplace=True)
     df2.sort_index(inplace=True)
-    common_columns = list(set(df1.columns) & set(df2.columns))
-    df1 = df1[common_columns]
-    df2 = df2[common_columns]
+
+    # Align indexes and columns so comparisons work even when APNs differ between datasets
+    df1, df2 = df1.align(df2, join='outer', axis=0, copy=False)
+    df1, df2 = df1.align(df2, join='outer', axis=1, copy=False)
+
     diff_df = df1.compare(df2)
-    #
     if diff_df.empty:
         return {}
-    new_values =diff_df.loc[:,pd.IndexSlice[:,'other']].droplevel(1,axis=1)
-    #This wouldn't have to be modified
-    dict_update = new_values.to_dict('index')
-    #
-    new_dict = {k: {a: b for a, b in v.items() if not pd.isnull(b)} 
-                for k, v in dict_update.items()}
-    # This portion gets rid of APNs with no changes to keep dictionary size managable
+
+    new_values = diff_df.loc[:, pd.IndexSlice[:, 'other']].droplevel(1, axis=1)
+
+    # Build a nested dict keyed by the comparison index. This handles duplicate APN values
+    # by merging all changed fields for the same key instead of failing on a non-unique index.
+    new_dict = {}
+    for key, row in new_values.iterrows():
+        if pd.isnull(key):
+            continue
+        updates = {field: value for field, value in row.items() if not pd.isnull(value)}
+        if updates:
+            new_dict.setdefault(key, {}).update(updates)
+
+    # This portion gets rid of APNs with no changes to keep dictionary size manageable
     keys_to_remove = []
     for outer_key, inner_dict in new_dict.items():
         inner_keys_to_remove = []
