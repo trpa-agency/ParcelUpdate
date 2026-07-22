@@ -61,7 +61,7 @@ parcelAOI = "Parcel_AOI"
 
 #sde feature classes to use in attribution stage
 sde_Impervious       = sdeBase + "\\sde.SDE.Impervious\\sde.SDE.Impervious_2019"
-sde_Bailey           = sdeBase + "\\sde.SDE.Soils\sde.SDE.land_capability_Bailey_Soils"
+sde_Bailey           = sdeBase + "\\sde.SDE.Soils\\sde.SDE.land_capability_Bailey_Soils"
 sde_RegionalLandUse  = os.path.join(sdeBase,"sde.SDE.Planning/sde.SDE.RegionalLandUse")
 sde_NRCSSoils1974    = sdeBase + "\\sde.SDE.Soils\\sde.SDE.NRCS_Soils_1974"
 sde_NRCSSoils2003    = sdeBase + "\\sde.SDE.Soils\\sde.SDE.NRCS_Soils_2003"
@@ -86,11 +86,11 @@ sde_Littoral         = sdeBase + "\\sde.SDE.Shorezone\\sde.SDE.LittoralParcel"
 sde_Tolerance        = sdeBase + "\\sde.SDE.Shorezone\\sde.SDE.Tolerance_District"
 
 # sde Collect feature classes to use for attribution
-sde_collect_IPES     = os.path.join(sdeCollect, 'SDE.Parcel\SDE.Parcel_LTinfo_IPES')
-sde_collect_LCV      = os.path.join(sdeCollect, 'SDE.Parcel\SDE.Parcel_LTinfo_LCV')
-sde_collect_BMP      = os.path.join(sdeCollect, 'SDE.Parcel\SDE.Parcel_BMP')
-sde_collect_Deed     = os.path.join(sdeCollect, 'SDE.Parcel\SDE.Parcel_LTinfo_Deed_Restriction')  
-sde_collect_VHR      = os.path.join(sdeCollect, 'SDE.Parcel\SDE.Parcel_VHR')
+sde_collect_IPES     = os.path.join(sdeCollect, r'SDE.Parcel\SDE.Parcel_LTinfo_IPES')
+sde_collect_LCV      = os.path.join(sdeCollect, r'SDE.Parcel\SDE.Parcel_LTinfo_LCV')
+sde_collect_BMP      = os.path.join(sdeCollect, r'SDE.Parcel\SDE.Parcel_BMP')
+sde_collect_Deed     = os.path.join(sdeCollect, r'SDE.Parcel\SDE.Parcel_LTinfo_Deed_Restriction')  
+sde_collect_VHR      = os.path.join(sdeCollect, r'SDE.Parcel\SDE.Parcel_VHR')
 
 # in memory fcs to use in the attribution stage
 memory = "memory" + "\\"
@@ -244,11 +244,11 @@ logger.info("Script Started: " + str(FIRSTstartTimer) + "\n")
 
 # Setup Counties to run
 counties_to_run = ['El Dorado', 'Placer', 'Douglas', 'Washoe', 'Carson City']
-
+# counties_to_run = ['El Dorado']
 ##--------------------------------------------------------------------------------------------------------#
 ## SETUP SEND EMAIL WITH LOG FILE ##
 ##--------------------------------------------------------------------------------------------------------#
-# path to text fil      e
+# path to text file
 fileToSend = log_file_path
 # email parameters
 subject = "Parcel Transformation Log File"
@@ -814,7 +814,7 @@ try:
                 if not (tax_year is None):
                     row[23] = tax_year
                 else:
-                    row[23] = ''
+                    row[23] = 0
                     
                 # County Land Use Code
                 county_luc = row[45]
@@ -1030,211 +1030,110 @@ try:
                 row[10] = 'CA'
                 
                 # Postal Zip - See Search/Update Cursor below
-                row[11] = ''    
-                
-                # Set Mailing Owner, Address, City, State, Zip
-                if row[38] != ' ':
-                    #Check MailAddr3 or MailAddr4 for country name
-                    if row[38] != 'UNKNOWN' and row[38].lower() not in countriesList and row[37].lower() not in countriesList:
-                        # Parse out city, state, and zip code and assign variables.
-                        cityStateZip = re.search(cityStateZipRegex, str(row[38]))
-                        if cityStateZip is not None:
-                            city = cityStateZip.group(1)
-                            state = cityStateZip.group(2)
-                            zipCode = cityStateZip.group(3)
-                            country = ''
-                        else:
-                            continue
-                        # Check to see if address starts with PO Box and assign variable.
-                        if str(row[37]).startswith('PO') or str(row[37]).startswith('P O'):
-                            address = str(row[37])
-                        elif "PO BOX" in str(row[37]) or "P O BOX" in str(row[37]) or "P.O. BOX" in str(row[37]):
-                            address = str(row[37])
+                row[11] = ''
 
-                        # Parse out address that doesn't have PO Box and assign variable.
-                        else:
-                            add = re.search(addressRegex,str(row[37]))
-                            address = add.group(1)
+                # Owner Full Name
+                row[12] = str(row[34]).strip() if row[34] else ''
 
-                        # Assign owner variable.
-                        owner = str(row[34])+' '+str(row[35])+' '+str(row[36])
-                    elif row[38].lower() in countriesList:
-                        country = str(row[38])
-                        state = str(row[37])
-                        city = str(row[36])
-                        address = str(row[35])
-                        owner = str(row[34])
-                        zipCode = ''
-                    elif row[38] == "CANADA": # temporary patch for incorrectly entered Canadian address
-                        canadaZip = re.search(r'[ABCEGHJKLMNPRSTVXY][0-9][ABCEGHJKLMNPRSTVWXYZ] ?[0-9][ABCEGHJKLMNPRSTVWXYZ][0-9]', str(row[3]))
-                        canadaProvZip = re.search(r'(.*?)\s(N[BLSTU]|[AMN]B|[BQ]C|ON|PE|SK)',str(row[36]))
-                        if canadaZip != None:
-                            zipCode = str(canadaZip.group(0))
-                        else:
-                            zipCode =''
-                            address = str(row[35])
-                            city = str(canadaProvZip.group(1))
-                            state = str(canadaProvZip.group(2))
-                            country = str(row[38])
-                    else:
-                        owner = str(row[34])
-                        address = ''
-                        city = ''
-                        state = ''
-                        zipCode = ''
-                        country = ''
+                #Pulling mailing address out of the hodgepodge of fields
+                PO_BOX_PREFIXES = ('PO', 'P O', 'P.O.', 'P  O', 'PO BOX', 'P O BOX', 'P.O. BOX')
 
-                # If mail_addr4 is "empty".
-                elif row[37] != ' ':
-        #             print("Working on MAIL_ADDR3")
-                    # Parse out city, state, and zip code.
-                    # Foreign addresses won't parse so assign country, owner, address, and city variables. Set state and zip to blanks.
-                    if cityStateZip is None:
-                        country = str(row[37])
-                        owner = str(row[34])
-                        address = str(row[35])
-                        city = str(row[36])
-                        state = ''
-                        zipCode = ''
-                    else:
-                        country = ''
-                        row2 = str(row[2])
+                def is_blank(val):
+                    return str(val).strip() == ''
 
-                        # Sanitize rows that start with a space.
-                        if str(row[36]).startswith(' '):
-                            row2 = str(row[36])[1:]
+                def strip_val(val):
+                    return str(val).strip()
 
-                        # Parse out city, state, and zip code and assign variables.
-                        city = cityStateZip.group(1)
-                        state = cityStateZip.group(2)
-                        zipCode = cityStateZip.group(3)
+                def is_po_box(val):
+                    v = val.upper().lstrip()
+                    return any(v.startswith(p) for p in PO_BOX_PREFIXES)
 
-                        # Check to see if address starts with PO Box and assign variable.
-                        if row2.startswith('PO') or row2.startswith('P O') or row2.startswith('P.O.'):
-                            address = row2
+                def is_care_of(val):
+                    v = val.upper().lstrip()
+                    return v.startswith('C/O') or v.startswith('CARE OF')
 
-                        # Sometimes there may be a word in front of PO Box and parse that out and assign variable.
-                        elif "PO BOX" in row2 or "P O BOX" in row2 or row2.startswith('ONE ') or row2.startswith('TWO '):
-                            address = row2
-                        else:
-                            # Parse out address that doesn't have PO Box and assign variable, sometimes there no address so set variable to None.
-                            add = re.search(addressRegex,row2)
-                            if add is None:
-                                address = 'None'
-                            else:
-                                address = add.group(1)
+                def parse_address(raw):
+                    """Extract a clean street address, or return raw if it's a PO Box or unmatched."""
+                    raw = raw.strip()
+                    if is_po_box(raw):
+                        return raw
+                    match = re.search(addressRegex, raw)
+                    return match.group(1) if match else raw
 
-                        # Assign owner variable.
-                        owner = str(row[34])+' '+str(row[35])
+                def parse_city_state_zip(raw):
+                    """Returns (city, state, zip) or None if no match."""
+                    m = re.search(cityStateZipRegex, str(raw))
+                    if m:
+                        return m.group(1), m.group(2), m.group(3)
+                    return None
 
-                # Before moving to mail_addr2 must capture "blanks" and USA owned parcels and insert blanks.
-                elif row[0] == 'UNITED STATES OF AMERICA':
-                    cityStateZip = re.search(cityStateZipRegex, str(row[36]))
-                    owner = str(row[34])
-                    address = str(row[35])
-                    if cityStateZip is None:
-                        city = ''
-                        state = ''
-                        zipCode = ''
-                    else:
-                        city = cityStateZip.group(1)
-                        state = cityStateZip.group(2)
-                        zipCode = cityStateZip.group(3)
-                    country = ''
-                elif row[34] == ' ':
-                    owner = ''
-                    address = ''
-                    city = ''
-                    state = ''
-                    zipCode = ''
-                    country = ''
-                elif row[35] == ' ':
-                    owner = str(row[34])
-                    address = ''
-                    city = ''
-                    state = ''
-                    zipCode = ''
-                    country = ''
+                # --- Main parsing block ---
+                owner_name_raw = strip_val(row[34])
+                addr1 = strip_val(row[35])
+                addr2 = strip_val(row[36])
+                addr3 = strip_val(row[37])
+                addr4 = strip_val(row[38])
 
-                # Parse the rest of the address info.
-                else:
-        #             print("Working on MAIL_ADDR2")
-                    if str(row[36]) == ' ':
-                        owner = str(row[34])
-                        address = str(row[35])
-                        city = ''
-                        state = ''
-                        zipCode = ''
-                        country = ''
-                    else:
-                        row2 = str(row[36])
+                # Normalize owner name and discard any C/O lines
+                owner = ' '.join(owner_name_raw.split())
 
-                        # Parse out city, state, and zip code and assign variables.
-                        cityStateZip = re.search(cityStateZipRegex, row2)
+                # If addr1 is a C/O line, discard it and shift remaining fields down
+                if is_care_of(addr1):
+                    addr1 = addr2
+                    addr2 = addr3
+                    addr3 = addr4
+                    addr4 = ''
 
-                        # if it can't parse it's a foreign address and assign country variable.
-                        if cityStateZip is None:
-                            if "CANADA" in row2:
-                                cityStateZip = re.search(canadaRegex, row2)
-                                city = cityStateZip.group(1)
-                                state = cityStateZip.group(2)
-                                zipCode = cityStateZip.group(4)
-                                country = cityStateZip.group(3)
-                            if "BRAZIL" in row2:
-                                cityStateZip = re.search(brazilRegex, row2)
-                                city = cityStateZip.group(1)
-                                state = ''
-                                zipCode = cityStateZip.group(3)
-                                country = cityStateZip.group(2)
-                        else:
-                            row1 = str(row[35])
-                            country = ''
-                            city = cityStateZip.group(1)
-                            state = cityStateZip.group(2)
-                            zipCode = cityStateZip.group(3)
+                # Defaults
+                address = ''
+                city = ''
+                state = ''
+                zipCode = ''
+                country = ''
 
-                            # Sanitize rows that start with a space.
-                            if row1.startswith(' '):
-                                row1 = row1[1:]
+                # Determine which field holds city/state/zip by working outward from addr4 -> addr3 -> addr2
+                if not is_blank(addr4) and addr4 not in ('UNKNOWN',) and addr4.lower() not in countriesList:
+                    csz = parse_city_state_zip(addr4)
+                    if csz:
+                        city, state, zipCode = csz
+                        address = parse_address(addr3)
+                    # else: foreign/unrecognized — leave blank (international)
 
-                            # Check to see if address starts with PO Box and assign variable.
-                            if row1.startswith('PO') or row1.startswith('P.O.') or row1.startswith('P O') or row1.startswith('P  O'):
-                                address = str(row[35])
+                elif not is_blank(addr3) and addr3.lower() not in countriesList:
+                    csz = parse_city_state_zip(addr3)
+                    if csz:
+                        city, state, zipCode = csz
+                        address = parse_address(addr2)
+                    # else: foreign/unrecognized — leave blank
 
-                            # Sometimes there may be a word in front of PO Box and parse that out and assign variable.
-                            elif "PO BOX" in row1 or "P O BOX" in row1:
-                                poBox = re.search(poBoxRegex,row1)
+                elif not is_blank(addr2):
+                    csz = parse_city_state_zip(addr2)
+                    if csz:
+                        city, state, zipCode = csz
+                        address = parse_address(addr1)
+                    # else: foreign/unrecognized — leave blank
 
-                                # If it can't be parsed assign variable.
-                                if poBox is None:
-                                    address = row1
-                                else:
-                                    address = poBox.group(2)
-                            else:
-                                # Parse out address that doesn't have PO Box and assign variable, sometimes there no address so set variable to None.
-                                add = re.search(addressRegex,row1)
+                elif not is_blank(addr1):
+                    address = addr1
 
-                                # Have exception for addresses that spell out 'one' instead of '1'.
-                                if add is None or row1.startswith('ONE'):
-                                    address = row1
-                                else:
-                                    address = add.group(1)
+                #logger.info(
+                #    f"ELD MAIL APN={row[0]!r} "
+                #    f"owner_name={owner_name_raw!r} "
+                #    f"mail_addr1={addr1!r} mail_addr2={addr2!r} "
+                #    f"mail_addr3={addr3!r} mail_addr4={addr4!r} "
+                #    f"-> owner={owner!r} address={address!r} "
+                #    f"city={city!r} state={state!r} zip={zipCode!r}"
+               # )
 
-                        # Set owner variable.
-                        owner = str(row[34])
-
-                # Set Owner
-                row[12] = owner
-                
                 # Set Mailing Address
                 row[13] = address
-                
+
                 # Set Mailing City
                 row[14] = city
-                
+
                 # Set Mailing State
                 row[15] = state
-                
+
                 # Set Mailing ZIP
                 row[16] = zipCode[:5]
         #         row[10] = country
@@ -1398,20 +1297,20 @@ try:
                                                 'STREETDIR',# street dir      #38
                                                 'STREETNAME',# street name    #39
                                                 'STREETTYPE',# street suffix  #40
-                                                'SP_APT',  # unit number      #41
+                                                'SPAPT',  # unit number      #41
                                                 'OWNER1',# owner name         #42
                                                 'OWNER2',# owner 2            #43
-                                                'MailingAdr1',  # mailing addr1      #44
-                                                'MailingAdr2',  # mailing addr2      #45
+                                                'MailingAddress1',  # mailing addr1      #44
+                                                'MailingAddress2',  # mailing addr2      #45
                                                 'MailingCity',  # city               #46 
                                                 'MailingState', # state              #47
                                                 'MailingZip',  # zip                 #48
-                                                'USE_CD', # land use code     #49
-                                                'USE_CD_N', # land use desc   #50
+                                                'USECODE', # land use code     #49
+                                                'USECODENAME', # land use desc   #50
                                                 'LANDVALUE',# land value      #51
                                                 'STRUCTURE',# improved value  #52
-                                                'EffectiveYr',# year built     #53
-                                                'Tot_Str_Sqft',  # build sqft      #54   - Changed 4/20/26. Was StructureSF
+                                                'EffectiveYEAR',# year built     #53
+                                                'StructureSqFt',  # build sqft      #54   - Changed 4/20/26. Was StructureSF
                                                 'SitusZip'      # Parcel zip      #55
                                             
         ]) as cursor:   
@@ -1949,7 +1848,7 @@ try:
                 if not (tax_year is None or tax_year=='' or tax_year.isspace()==True):
                     row[25] = tax_year
                 else:
-                    row[25] = None
+                    row[25] = 0
                     
                 # County Land Use Code
                 county_luc = row[52]
