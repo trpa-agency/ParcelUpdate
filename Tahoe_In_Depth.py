@@ -255,6 +255,9 @@ def validate_row(street: str, city: str, state: str, zip_code: str):
         return "INVALID", "No Street"
     if st in PLACEHOLDER_STREETS:
         return "INVALID", "Invalid Street"
+    # Check if address is only a number
+    if st.isdigit():
+        return "INVALID", "Address is only a number"
 
     # City
     if not ct:
@@ -474,7 +477,9 @@ def process(df: pd.DataFrame) -> pd.DataFrame:
         # Apply ZIP-to-city override AFTER standardizing both fields
         std_city, zip_city_note = apply_zip_city_override(std_city, std_zip)
 
-        street_for_full = std_street2 if std_street2 else std_street1
+        # Use the physical address for STD_FULL_ADDRESS when both a physical
+        # address and a PO BOX are present.
+        street_for_full = std_street1 if std_street1 else std_street2
         parts = [p for p in [street_for_full, std_city,
                               f"{std_state} {std_zip}".strip()] if p]
 
@@ -687,7 +692,8 @@ def build_deduped(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
     # Remove records with specific REASON values that should never appear on Sheet 2
-    EXCLUDE_REASONS = {"State/ZIP Mismatch", "Invalid ZIP Prefix", "Invalid Street", "Invalid State"}
+    EXCLUDE_REASONS = {"State/ZIP Mismatch", "Invalid ZIP Prefix", "Invalid Street", "Invalid State", 
+                       "Address is only a number", "No Street", "No City", "Missing ZIP"}
     df = df[~df["REASON"].isin(EXCLUDE_REASONS)]
 
     # Remove excluded owner names
@@ -711,6 +717,20 @@ def build_deduped(df: pd.DataFrame) -> pd.DataFrame:
     valid_street_zip = (deduped["STD_STREET"] != "") & (deduped["STD_ZIP"] != "")
     street_zip_key   = deduped["STD_STREET"] + "|" + deduped["STD_ZIP"]
     deduped = deduped[~(valid_street_zip & street_zip_key.duplicated(keep="first"))]
+
+    # Drop dupes on STD_STREET1 + STD_ZIP (catches same physical address, ignoring PO BOX differences)
+    # E.g., "1 BIG WATER DR #A201 PO BOX 1155" and "1 BIG WATER DR #A201" are the same address
+    if "STD_STREET1" in deduped.columns:
+        valid_street1_zip = (deduped["STD_STREET1"] != "") & (deduped["STD_ZIP"] != "")
+        street1_zip_key   = deduped["STD_STREET1"] + "|" + deduped["STD_ZIP"]
+        deduped = deduped[~(valid_street1_zip & street1_zip_key.duplicated(keep="first"))]
+
+    # Drop dupes on STD_STREET2 + STD_ZIP (catches same PO BOX address when one row
+    # contains both physical and PO BOX addresses and another row contains only PO BOX)
+    if "STD_STREET2" in deduped.columns:
+        valid_street2_zip = (deduped["STD_STREET2"] != "") & (deduped["STD_ZIP"] != "")
+        street2_zip_key   = deduped["STD_STREET2"] + "|" + deduped["STD_ZIP"]
+        deduped = deduped[~(valid_street2_zip & street2_zip_key.duplicated(keep="first"))]
 
     # Deduplicate on name+ZIP, name only, and name+city
     owner_col = "OwnerName" if "OwnerName" in deduped.columns else None
