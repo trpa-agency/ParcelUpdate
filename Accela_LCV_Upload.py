@@ -3,18 +3,18 @@ Accela_LCV_Upload.py
 Created: July 29, 2026
 Amy Fish, Tahoe Regional Planning Agency
 
-Reads c:\\temp\\DownloadTahoe\\Index.xlsx (columns: File, APN, File Number, Type).
-Rows are grouped by their FULL RESOLVED SET OF PARCELS, since a document can
-reference multiple parcels and multiple documents can reference the same
-parcel set (i.e. belong to the same permit).
+Reads \\arcmain\\e$\\DownloadTahoeIndex.xlsx (columns: File, APN, File Number, Type).
+Rows are grouped by their parcel IDs, since a document can reference multiple parcels and 
+multiple documents 
+
 For each unique parcel set:
   1. Checks whether every parcel in the set exists in Accela.
   2. If they all exist: creates ONE "Land Capability Verification" record
      with ALL of those parcels attached, then uploads every file from every
-     row in the group (from c:\\temp\\DownloadTahoe\\) to that one record.
+     row in the group (from \\arcmain\\e$\\DownloadTahoe\\) to that one record.
   3. If any parcel is missing: logs every row in the group as failed and
      moves on -- no partial records get created.
-Writes a per-file success/failure log to c:\\temp\\accela_lcv_log.csv (rows
+Writes a per-file success/failure log to \\arcmain\\e$\\DownloadTahoe\\accela_lcv_log.csv (rows
 sharing the same RecordID mean those files were attached to the same record).
 
 Requires: pip install requests openpyxl
@@ -33,20 +33,37 @@ AUTH_URL = "https://auth.accela.com/oauth2/token"
 RECORDS_URL = "https://apis.accela.com/v4/records"
 PARCELS_URL = "https://apis.accela.com/v4/parcels"
 
-APP_ID = "PUT_YOUR_APP_ID_HERE"
+APP_ID = ""
+
+PASSWORDS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "passwords.txt")
+
+
+def load_credentials(path):
+    creds = {}
+    with open(path, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            creds[key.strip()] = value.strip()
+    return creds
+
+
+_creds = load_credentials(PASSWORDS_FILE)
 
 scope = "records documents parcels"
 client_id = "638769013925399246"
-client_secret = "c4d2bfe32c9e40e9919f851236206db0"
-username = "FIREASIDE"
-password = "123456FA!"
+client_secret = _creds["client_secret"]
+username = _creds["username"]
+password = _creds["password"]
 environment = "NONPROD1"
 grant_type = "password"
 agency_name = "TRPA"
 
-INDEX_XLSX = r"c:\temp\DownloadTahoe\Index.xlsx"
-DOCS_FOLDER = r"c:\temp\DownloadTahoe"  # ASSUMPTION: files in the "File" column live here
-LOG_CSV = r"c:\temp\accela_lcv_log.csv"
+INDEX_XLSX = r"\\arcmain\\e$\\DownloadTahoe\\Index.xlsx"
+DOCS_FOLDER = r"\\arcmain\\e$\\DownloadTahoe"  # ASSUMPTION: files in the "File" column live here
+LOG_CSV = r"\\arcmain\\e$\\DownloadTahoe\\accela_lcv_log.csv"
 
 # Hardcoded record type: Land Capability Verification (per spec)
 LCV_TYPE = {
@@ -122,6 +139,8 @@ def read_index(xlsx_path):
             "File Number": row[col_idx["File Number"]],
             "Type": row[col_idx["Type"]],
         })
+        if len(records) >= 5:   #For testing purposes I'm just running the first 5
+            break
     return records
 
 
@@ -196,21 +215,20 @@ def parse_apn_cell(raw):
         (some cells contain a typed backslash-n rather than an actual newline)
       - commas, slashes, and the word "AND" as separators
       - space-separated full APNs with no delimiter at all
-      - shorthand tokens that borrow the prefix from the most recent full APN
+      - APN string that borrows the prefix from the most recent full APN
         in the cell, e.g. "090-243-004 AND -005" -> ...-004, ...-005
-      - shorthand with no leading dash, e.g. "122-181-02 AND 42" -> ...-02, ...-42
+      - no leading dash, e.g. "122-181-02 AND 42" -> ...-02, ...-42
       - four county APN shapes: El Dorado/Placer (xxx-xxx-xxx), Washoe
-        (xxx-xxx-xx), Douglas (xxxx-xx-xxx-xxx) -- shorthand fill-width always
-        matches the most recent full APN's final-group width
+        (xxx-xxx-xx), Douglas (xxxx-xx-xxx-xxx)
       - stray trailing punctuation, e.g. "093-360-016`"
       - accidental double dashes, e.g. "116-220--008" -> 116-220-008
       - "BASE-NN TO -MM" / "BASE-NN TO MM" ranges, expanded to every APN in
-        the inclusive range, e.g. "123-190-01 TO -25" -> 25 APNs
+        the range, e.g. "123-190-01 TO -25" -> 25 APNs
 
     Returns a list of (resolved_apn, raw_token) tuples. resolved_apn is None
     when a token can't be resolved (e.g. a shorthand token with no preceding
     full APN in the cell, or an APN that doesn't match any known county shape)
-    -- callers should log these as errors, not silently drop them.
+    -- log these as errors
     """
     if raw is None:
         return []
@@ -362,6 +380,37 @@ def create_lcv_record(access_token, apns):
     return record_id, custom_id
 
 
+def get_record_fees(access_token, record_id):
+    """Return the list of fee line items currently on a record."""
+    headers = base_headers(access_token)
+    resp = requests.get(f"{RECORDS_URL}/{record_id}/fees", headers=headers)
+    if resp.status_code != 200:
+        raise RuntimeError(f"Get fees error for record {record_id}: {resp.status_code} {resp.text}")
+
+    data = resp.json()
+    result = data.get("result", data)
+    return result or []
+
+
+def delete_record_fees(access_token, record_id, fee_ids):
+    """Delete the given fee line item ids from a record."""
+    if not fee_ids:
+        return
+    headers = base_headers(access_token)
+    ids_str = ",".join(str(fid) for fid in fee_ids)
+    resp = requests.delete(f"{RECORDS_URL}/{record_id}/fees/{ids_str}", headers=headers)
+    if resp.status_code != 200:
+        raise RuntimeError(f"Delete fees error for record {record_id}: {resp.status_code} {resp.text}")
+
+
+def remove_auto_added_fees(access_token, record_id):
+    """Remove every fee line item Accela auto-added when the record was created."""
+    fees = get_record_fees(access_token, record_id)
+    fee_ids = [f.get("id") for f in fees if f.get("id")]
+    delete_record_fees(access_token, record_id, fee_ids)
+    return len(fee_ids)
+
+
 def upload_document(access_token, record_id, file_path):
     """Attach a PDF document to the given record."""
     if not os.path.isfile(file_path):
@@ -371,7 +420,7 @@ def upload_document(access_token, record_id, file_path):
     file_name = os.path.basename(file_path)
 
     headers = {
-        "Authorization": f"Bearer {access_token}",
+        "Authorization": access_token,
         "x-accela-appid": APP_ID,
         # Do NOT set Content-Type here; requests will set the correct multipart boundary
     }
@@ -482,6 +531,14 @@ def main():
 
         print(f"[OK] parcels {parcels_str} -> record {custom_id or record_id} "
               f"({len(group)} document(s) to attach)")
+
+        # 2b. Remove the fee(s) Accela auto-added on record creation
+        try:
+            removed = remove_auto_added_fees(token, record_id)
+            if removed:
+                print(f"    [OK] removed {removed} auto-added fee(s) from record {custom_id or record_id}")
+        except Exception as e:
+            print(f"    [WARN] could not remove auto-added fee(s) from record {custom_id or record_id}: {e}")
 
         # 3. Upload every file from every row in this group to that one record
         for row in group:
