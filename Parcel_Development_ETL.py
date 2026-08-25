@@ -55,8 +55,22 @@ fdata = sdeCollect + "\\sde_collection.SDE.Parcel"
 # string to use in updaetSDE function
 sdeString  = fdata + "\\sde_collection.SDE."
 
+def load_credentials(path):
+    creds = {}
+    with open(path, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            creds[key.strip()] = value.strip()
+    return creds
+
+
+_creds = load_credentials(os.path.join(os.path.dirname(os.path.abspath(__file__)), "passwords.txt"))
+
 # connect to bmp SQL dataabase
-connection_string = "DRIVER={ODBC Driver 17 for SQL Server};SERVER=sql14;DATABASE=tahoebmpsde;UID=sde;PWD=staff"
+connection_string = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER=sql14;DATABASE=tahoebmpsde;UID={_creds['sde_username']};PWD={_creds['sde_password']}"
 connection_url = URL.create("mssql+pyodbc", query={"odbc_connect": connection_string})
 engine = create_engine(connection_url)
 
