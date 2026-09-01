@@ -6,6 +6,7 @@ from time import strftime
 import utils
 import argparse
 import sys
+import os
 
 # environment settings
 arcpy.env.workspace = "F:/GIS/PARCELUPDATE/Workspace/ParcelStaging.gdb"
@@ -50,10 +51,24 @@ arcpy.CreateVersion_management(inWorkspace, parent_version, new_version_name, "P
 
 # Create Local Database Connection
 # Enterprise geodatabase connection parameters
+def load_credentials(path):
+    creds = {}
+    with open(path, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            creds[key.strip()] = value.strip()
+    return creds
+
+
+_creds = load_credentials(os.path.join(os.path.dirname(os.path.abspath(__file__)), "passwords.txt"))
+
 server_name = "sql12"
 database_name = "sde"
-username = "sde"
-password = "staff"
+username = _creds["sde_username"]
+password = _creds["sde_password"]
 
 arcpy.CreateDatabaseConnection_management(
     out_folder_path='db_connections/',

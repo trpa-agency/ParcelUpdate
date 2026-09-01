@@ -4,6 +4,7 @@ import arcpy
 import pandas as pd
 from time import strftime
 import utils
+import os
 
 # environment settings
 arcpy.env.overwriteOutput = True
@@ -30,10 +31,24 @@ for version in version_list:
 
 # Create Local Database Connection
 # Enterprise geodatabase connection parameters
+def load_credentials(path):
+    creds = {}
+    with open(path, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            creds[key.strip()] = value.strip()
+    return creds
+
+
+_creds = load_credentials(os.path.join(os.path.dirname(os.path.abspath(__file__)), "passwords.txt"))
+
 server_name = "sql12"
 database_name = "sde"
-username = "sde"
-password = "staff"
+username = _creds["sde_username"]
+password = _creds["sde_password"]
 
 arcpy.CreateDatabaseConnection_management(
     out_folder_path='db_connections/',

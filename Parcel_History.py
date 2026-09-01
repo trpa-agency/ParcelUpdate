@@ -37,11 +37,25 @@ receiver_email = "afish@trpa.gov"
 
 year_to_update = f"b{current_year}Active"
 
+def load_credentials(path):
+    creds = {}
+    with open(path, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            creds[key.strip()] = value.strip()
+    return creds
+
+
+_creds = load_credentials(os.path.join(os.path.dirname(os.path.abspath(__file__)), "passwords.txt"))
+
 # Set the database connection. Versioned edits require the creation of a connection file
 server_name = "sql12"
 database_name = "sde"
-username = "sde"
-password = "staff"
+username = _creds["sde_username"]
+password = _creds["sde_password"]
 database_connection = 'db_connections/HistoryConnectionFile.sde'
 
 # Define the existing layers

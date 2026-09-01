@@ -71,8 +71,6 @@ accelaFiles = "//trpa-fs01/GIS/Acella/Reports"
 # Get database user and password from environment variables
 db_user             = os.environ.get('DB_USER')
 db_password         = os.environ.get('DB_PASSWORD')
-#db_user             = 'sde'
-#db_password         = 'staff'
 driver              = 'ODBC Driver 17 for SQL Server'
 tabular_database    = 'sde_tabular'
 serverSQL12         = 'sql12'
