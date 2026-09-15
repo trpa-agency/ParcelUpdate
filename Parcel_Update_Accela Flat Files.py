@@ -20,14 +20,29 @@ from sqlalchemy.orm import sessionmaker
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
+def load_credentials(path):
+    creds = {}
+    with open(path, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            creds[key.strip()] = value.strip()
+    return creds
+
+
+_creds = load_credentials(os.path.join(os.path.dirname(os.path.abspath(__file__)), "passwords.txt"))
 
 # Staging database  (Data Source=sql12; Initial Catalog=sde)
+username = _creds["sde_username"]
+password = _creds["sde_password"]
 STAGING_DB = {
     "host":     "sql12",
     "database": "sde",
     "trusted":  False,   # Windows auth — no username/password needed
-    "username": "sde",
-    "password": "",
+    "username": username,
+    "password": password,
     "driver":   "ODBC+Driver+17+for+SQL+Server",
 }
 
@@ -37,7 +52,7 @@ STAGING_TABULAR_DB = {
     "database": "sde_tabular",
     "trusted":  False,   # Windows auth — no username/password needed
     "username": "sde",
-    "password": "",
+    "password": "staff",
     "driver":   "ODBC+Driver+17+for+SQL+Server",
 }
 

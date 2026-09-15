@@ -254,7 +254,7 @@ fileToSend = log_file_path
 subject = "Parcel Transformation Log File"
 sender_email = "infosys@trpa.org"
 # password = ''
-receiver_email = "afish@trpa.gov"
+receiver_email = "gis@trpa.gov"
 #----------------------------------------------------------------------
 # FUNCTIONS
 #----------------------------------------------------------------------
