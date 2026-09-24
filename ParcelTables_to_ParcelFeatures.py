@@ -76,19 +76,19 @@ accelaFiles = "//trpa-fs01/GIS/Acella/Reports"
 db_user             = os.environ.get('DB_USER')
 db_password         = os.environ.get('DB_PASSWORD')
 
-driver              = 'ODBC Driver 17 for SQL Server'
+driver              = '{ODBC Driver 18 for SQL Server}'
 tabular_database    = 'sde_tabular'
 serverSQL12         = 'sql12'
 bmp_database        = 'tahoebmpsde'
 serverSQL14         = 'sql14'
 
 # connect to BMP SQL dataabase
-BMP_connection_string = f"DRIVER={driver};SERVER={serverSQL14};DATABASE={bmp_database};UID={db_user};PWD={db_password}"
+BMP_connection_string = f"DRIVER={driver};SERVER={serverSQL14};DATABASE={bmp_database};UID={db_user};PWD={db_password};TrustServerCertificate=yes"
 BMP_connection_url = URL.create("mssql+pyodbc", query={"odbc_connect": BMP_connection_string})
 BMP_engine = create_engine(BMP_connection_url)
 
 # connect to Tabular SQL dataabase
-connection_string = f"DRIVER={driver};SERVER={serverSQL12};DATABASE={tabular_database};UID={db_user};PWD={db_password}"
+connection_string = f"DRIVER={driver};SERVER={serverSQL12};DATABASE={tabular_database};UID={db_user};PWD={db_password};TrustServerCertificate=yes"
 connection_url = URL.create("mssql+pyodbc", query={"odbc_connect": connection_string})
 Tab_engine = create_engine(connection_url)
 
@@ -123,7 +123,7 @@ fileToSend = log_file_path
 # email parameters
 subject = "Parcel Tables to Parcel Features ETL"
 sender_email = "infosys@trpa.org"
-receiver_email = "afish@trpa.gov"
+receiver_email = "gis@trpa.gov"
 updated_items = []
 failed_items = []
 current_item = None
@@ -482,11 +482,6 @@ with BMP_engine.begin() as bmpConnect:
 # create spatial dataframe from parcel master SDE
 parcels = sdeBase + "\\sde.SDE.Parcels\\sde.SDE.Parcel_Master"
 sdfParcels = pd.DataFrame.spatial.from_featureclass(parcels)
-       
-# report how long it took to get the data
-endTimer = datetime.datetime.now() - startTimer
-print("\nTime it took to get the data: {}".format(endTimer))   
-logger.info("\nTime it took to get the data: {}".format(endTimer)) 
 
 #---------------------------------------------------------------------------------------#
 ## TRANSFORM TABLES INTO STAGING LAYERS
