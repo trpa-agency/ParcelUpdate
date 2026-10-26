@@ -12,7 +12,7 @@ import requests
 from pyproj import Transformer
 
 # setup
-WKT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Updated_Shapes_2026-09-02.wkt")
+WKT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Updated_Shapes_2026-10-23.wkt")
 POST_URL = "https://api.laketahoeinfo.org/parcels"
 API_KEY = "ee44fc77-6602-4276-9a8b-1e4508104e9f"
 

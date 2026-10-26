@@ -39,25 +39,25 @@ BMP_DB = {
     "database": "tahoebmpsde",
     "username": username,
     "password": password,
-    "driver":   "ODBC+Driver+17+for+SQL+Server",
+    "driver":   "ODBC+Driver+18+for+SQL+Server",
 }
 
 # Staging database  (Data Source=sql12; Initial Catalog=sde)
 STAGING_DB = {
     "host":     "sql12",
     "database": "sde",
-    "username": "sde",
-    "password": "staff",
-    "driver":   "ODBC+Driver+17+for+SQL+Server",
+    "username": username,
+    "password": password,
+    "driver":   "ODBC+Driver+18+for+SQL+Server",
 }
 
 # Staging tabular database  (Data Source=sql12; Initial Catalog=sde_tabular)
 STAGING_TABULAR_DB = {
     "host":     "sql12",
     "database": "sde_tabular",
-    "username": "sde",
-    "password": "staff",
-    "driver":   "ODBC+Driver+17+for+SQL+Server",
+    "username": username,
+    "password": password,
+    "driver":   "ODBC+Driver+18+for+SQL+Server",
 }
 
 
@@ -135,6 +135,11 @@ def execute_dml(bmp_session, sql: str, params: dict = None):
 # ---------------------------------------------------------------------------
 # Helper utilities
 # ---------------------------------------------------------------------------
+
+# Staging JURISDICTION code -> BMP JurisdictionID. CSLT/SL = 5 is inferred from the old
+# hardcoded value; verify against the BMP jurisdiction lookup table.
+JURISDICTION_IDS = {"DG": 1, "WA": 2, "EL": 3, "PL": 4, "CSLT": 5, "SL": 5, "CC": 9}
+
 
 def get_jurisdiction_id(county_name: str) -> str:
     mapping = {"DG": "1", "EL": "3", "WA": "2", "CC": "9", "PL": "4"}
@@ -475,7 +480,10 @@ def update_bmp_attributes(bmp_session, staging_session, validate_only: bool):
 
             ppno = bmp["ParcelID"]
             watershed_bmp = str(bmp["WatershedID"])
-            firepd_bmp = str(bmp["sFireDistrict"])
+            # NULL means no tblFireDistrict row yet; keep it empty so the INSERT branch runs
+            firepd_bmp = str(bmp["sFireDistrict"] or "").strip()
+            if firepd_bmp == "None":
+                firepd_bmp = ""
             jurisdiction_bmp = str(bmp["Jurisdiction"]) + " County"
             if jurisdiction_bmp == "City South Lake Tahoe County":
                 jurisdiction_bmp = "City of South Lake Tahoe"
@@ -542,15 +550,22 @@ def update_bmp_attributes(bmp_session, staging_session, validate_only: bool):
                     jurisdiction_bmp == "City of South Lake Tahoe"
                     and jurisdiction_full == "El Dorado County"
                 )
+                jurisdiction_id = JURISDICTION_IDS.get(jurisdiction.upper())
                 if not skip and jurisdiction_full:
+                    if jurisdiction_id is None:
+                        lines.append(
+                            f"{apn}: Jurisdiction {jurisdiction} has no JurisdictionID mapping - NOT updated"
+                        )
+                        continue
                     lines.append(
-                        f"{apn}: Updated Jurisdiction from {jurisdiction_bmp} to {jurisdiction_full}"
+                        f"{apn}: Updated Jurisdiction from {jurisdiction_bmp} to {jurisdiction_full} "
+                        f"(JurisdictionID {jurisdiction_id})"
                     )
                     if not validate_only:
                         execute_dml(
                             bmp_session,
                             "UPDATE sde.tblParcel SET JurisdictionID = :v WHERE ParcelID = :ppno",
-                            {"v": 5, "ppno": ppno},
+                            {"v": jurisdiction_id, "ppno": ppno},
                         )
 
         lines.append(f"Completed at: {datetime.now()}")

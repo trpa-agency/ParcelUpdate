@@ -43,7 +43,7 @@ STAGING_DB = {
     "trusted":  False,   # Windows auth — no username/password needed
     "username": username,
     "password": password,
-    "driver":   "ODBC+Driver+17+for+SQL+Server",
+    "driver":   "ODBC+Driver+18+for+SQL+Server",
 }
 
 # Staging tabular database  (Data Source=sql12; Initial Catalog=sde_tabular)
@@ -51,16 +51,16 @@ STAGING_TABULAR_DB = {
     "host":     "sql12",
     "database": "sde_tabular",
     "trusted":  False,   # Windows auth — no username/password needed
-    "username": "sde",
-    "password": "staff",
-    "driver":   "ODBC+Driver+17+for+SQL+Server",
+    "username": username,
+    "password": password,
+    "driver":   "ODBC+Driver+18+for+SQL+Server",
 }
 
 # Accela database  (Data Source=sql24; Initial Catalog=TRPA_PROD; Integrated Security=True)
 ACCELA_DB = {
     "host":     "sql24",
     "database": "TRPA_PROD",
-    "driver":   "ODBC+Driver+17+for+SQL+Server",
+    "driver":   "ODBC+Driver+18+for+SQL+Server",
     "trusted":  True,   # Windows auth — no username/password needed
 }
 
@@ -237,7 +237,8 @@ def translate_jurisdiction(code: str) -> str:
  
 def write_file(filename: str, content: str):
     path = os.path.join(OUTPUT_DIR, filename)
-    with open(path, "w", encoding="utf-8") as f:
+    # newline="" stops Windows turning the "\r\n" already in the records into "\r\r\n"
+    with open(path, "w", encoding="utf-8", newline="") as f:
         f.write(content)
     log.info("Written -> %s", path)
  
