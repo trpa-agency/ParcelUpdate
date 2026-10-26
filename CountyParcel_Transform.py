@@ -528,22 +528,37 @@ try:
                 # Mailing Zip
                 mail_zip = row[cursor.fields.index('MZip')]
                 row[cursor.fields.index('MAIL_ZIP5_TRPA')] = mail_zip[:5] if mail_zip and len(mail_zip) >= 5 else ''
+                
+                # Carson AssrData now publishes TAXABLE values in Land_Value / Improv_Val
+                # (was assessed before the portal.carsoncity.gov move). NV assessed = 0.35 x taxable.
+                land_value = row[cursor.fields.index('Land_Value')] or 0
+                improved_value = row[cursor.fields.index('Improv_Val')] or 0
 
-                # Assessed Land Value
-                land_value = row[cursor.fields.index('Land_Value')]
-                row[cursor.fields.index('AS_LANDVALUE_TRPA')] = land_value if land_value else 0
+                # Tax Values (raw from county)
+                row[cursor.fields.index('TAX_LANDVALUE_TRPA')] = int(land_value)
+                row[cursor.fields.index('TAX_IMPROVALUE_TRPA')] = int(improved_value)
+                row[cursor.fields.index('TAX_SUM_TRPA')] = int(land_value + improved_value)
 
-                # Assessed Improved Value
-                improved_value = row[cursor.fields.index('Improv_Val')]
-                row[cursor.fields.index('AS_IMPROVALUE_TRPA')] = improved_value if improved_value else 0
+                # Assessed Values (35 percent of taxable)
+                row[cursor.fields.index('AS_LANDVALUE_TRPA')] = int(round(land_value * 0.35))
+                row[cursor.fields.index('AS_IMPROVALUE_TRPA')] = int(round(improved_value * 0.35))
+                row[cursor.fields.index('AS_SUM_TRPA')] = int(round(land_value * 0.35)) + int(round(improved_value * 0.35))
 
-                # Assessed Sum
-                row[cursor.fields.index('AS_SUM_TRPA')] = (land_value or 0) + (improved_value or 0)
+                # # Assessed Land Value
+                # land_value = row[cursor.fields.index('Land_Value')]
+                # row[cursor.fields.index('AS_LANDVALUE_TRPA')] = land_value if land_value else 0
 
-                # Tax Values
-                row[cursor.fields.index('TAX_LANDVALUE_TRPA')] = (land_value / 0.35) if land_value else None
-                row[cursor.fields.index('TAX_IMPROVALUE_TRPA')] = (improved_value / 0.35) if improved_value else None
-                row[cursor.fields.index('TAX_SUM_TRPA')] = ((land_value or 0) / 0.35) + ((improved_value or 0) / 0.35)
+                # # Assessed Improved Value
+                # improved_value = row[cursor.fields.index('Improv_Val')]
+                # row[cursor.fields.index('AS_IMPROVALUE_TRPA')] = improved_value if improved_value else 0
+
+                # # Assessed Sum
+                # row[cursor.fields.index('AS_SUM_TRPA')] = (land_value or 0) + (improved_value or 0)
+
+                # # Tax Values
+                # row[cursor.fields.index('TAX_LANDVALUE_TRPA')] = (land_value / 0.35) if land_value else None
+                # row[cursor.fields.index('TAX_IMPROVALUE_TRPA')] = (improved_value / 0.35) if improved_value else None
+                # row[cursor.fields.index('TAX_SUM_TRPA')] = ((land_value or 0) / 0.35) + ((improved_value or 0) / 0.35)
 
                 # Tax Year
                 row[cursor.fields.index('TAX_YEAR_TRPA')] = datetime.datetime.now().year
